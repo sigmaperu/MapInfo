@@ -6,14 +6,14 @@
 <title>ATEII – Atención actual vs propuesta</title>
 
 <!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 
 <!-- PapaParse (CSV) -->
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
 
 <!-- Turf.js (punto en polígono) -->
-<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js" crossorigin="anonymous"></script>
 
 <style>
   :root{
@@ -124,11 +124,15 @@
 <script>
 (function(){
   const CSV_URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
-  // Usamos el RAW del GeoJSON (no el enlace "blob")
   const GEOJSON_URL = "https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson";
 
   // ====== Catálogos y configuración ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
+
+  // Distritos a excluir (normalizados; se contemplan con/ sin acentos)
+  const EXCLUDE_DISTRICTS = new Set([
+    "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA","VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
+  ].map(s => normalize(s)));
 
   // Mapeo de letras a nombres (X = Miércoles)
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
@@ -160,17 +164,20 @@
     attribution:'&copy; OpenStreetMap'
   }).addTo(map);
 
-  // Capa sin clustering
+  // Capas sin clustering
   let currentLayer = L.layerGroup().addTo(map);
   let proposedLayer = L.layerGroup();
   let boundaryLayer = L.geoJSON(null, { style: { color:'#ef4444', weight:1, fill:false } });
 
   // ====== Datos ======
   let areaFeatures = null; // GeoJSON FeatureCollection
-  let records = []; // {code,distrito,office,daysRaw,days[],freqLetters,lat,lon,part,proposedDays[],proposedLetters}
+  let records = []; // {code,name,distrito,office,daysRaw,days[],freqLetters,lat,lon,part,proposedDays[],proposedLetters}
 
   // ====== Utilitarios ======
   function normalize(s){ return (s ?? "").toString().normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().trim(); }
+  function normalizeName(s){
+    return normalize(s).replace(/\s+/g,' '); // compactar espacios
+  }
   function num(s){
     if (s == null) return NaN;
     const t = s.toString().replace(",", "."); // por si viniera coma decimal
@@ -248,6 +255,7 @@
     return `
       <div style="min-width:240px">
         <div style="font-weight:700; font-size:14px; margin-bottom:6px;">Cliente: ${r.code}</div>
+        <div><strong>Nombre:</strong> ${r.name || "—"}</div>
         <div><strong>Distrito:</strong> ${r.distrito}</div>
         <div><strong>Oficina:</strong> ${r.office}</div>
         <hr style="border:none;border-top:1px solid #1f2937; margin:6px 0;">
@@ -335,12 +343,14 @@
 
   // ====== Ingesta del CSV + GeoJSON ======
   function ingestRows(rows){
-    records = [];
     const startIdx = hasHeader(rows[0]) ? 1 : 0;
 
+    // 1) Filtrado base y armado preliminar
+    const prelim = [];
     for (let i=startIdx; i<rows.length; i++){
       const row = rows[i];
       if (!row) continue;
+
       const lat = num(row[28]);
       const lon = num(row[29]);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
@@ -349,29 +359,48 @@
       const officeNorm = normalize(office);
       if (!OFFICES.has(officeNorm)) continue;
 
-      // Solo clientes dentro del polígono
+      // Dentro del polígono
       if (!pointInsideArea(lat, lon)) continue;
 
       const distrito = (row[17] ?? "").toString().trim();
+      const distNorm = normalize(distrito);
+      // Excluir ciertos distritos
+      if (EXCLUDE_DISTRICTS.has(distNorm)) continue;
+
       const code = (row[0] ?? "").toString().trim();
+      const name = (row[7] ?? "").toString().trim();
       const daysRaw = (row[48] ?? "").toString().trim();
       const days = parseDays(daysRaw);
       const freqLetters = toFreqLetters(days);
 
-      records.push({ code, distrito, office, daysRaw, days, freqLetters, lat, lon });
+      prelim.push({ code, name, distrito, office, daysRaw, days, freqLetters, lat, lon });
     }
 
-    // Balancear por cantidad → A/B/C
+    // 2) Deduplicación por (nombre normalizado + lat/lon) entre oficinas
+    //    Se conserva el primer registro encontrado (no importa la oficina).
+    const seen = new Set();
+    const deduped = [];
+    for (const r of prelim){
+      const nameKey = normalizeName(r.name || "");
+      const latKey = Number.isFinite(r.lat) ? r.lat.toFixed(6) : "";
+      const lonKey = Number.isFinite(r.lon) ? r.lon.toFixed(6) : "";
+      const key = `${nameKey}|${latKey}|${lonKey}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(r);
+    }
+
+    // 3) Guardar y particionar equilibradamente por cantidad
+    records = deduped;
     assignBalancedPartsByLongitude();
 
-    // Pintar
+    // 4) Pintar
     refreshLayers();
   }
 
   // ====== Eventos UI ======
-  const viewToggle = document.getElementById('viewToggle');
-  viewToggle.addEventListener('change', ()=>{
-    viewMode = viewToggle.checked ? "Propuesta" : "Actual";
+  document.getElementById('viewToggle').addEventListener('change', (e)=>{
+    viewMode = e.target.checked ? "Propuesta" : "Actual";
     refreshLayers();
   });
 
@@ -401,12 +430,12 @@
     .then(geo => {
       areaFeatures = geo && geo.type === "FeatureCollection" ? geo : { type:"FeatureCollection", features: [geo] };
       boundaryLayer.addData(areaFeatures).addTo(map);
-      // Centrar de inicio al polígono
+      // Centrar al polígono
       try {
         const b = boundaryLayer.getBounds();
         if (b && b.isValid()) map.fitBounds(b.pad(0.05));
       } catch(e){}
-      // Luego cargar CSV
+      // Cargar CSV
       Papa.parse(CSV_URL, {
         download:true,
         dynamicTyping:false,
@@ -428,7 +457,7 @@
     .catch(err => {
       console.error("No se pudo cargar el GeoJSON:", err);
       alert("No se pudo cargar el GeoJSON de límites.");
-      // Aun así intentamos cargar CSV
+      // Intentar cargar CSV igual (sin filtro espacial)
       Papa.parse(CSV_URL, {
         download:true,
         dynamicTyping:false,
@@ -439,7 +468,6 @@
             alert("No se pudo leer el CSV o está vacío.");
             return;
           }
-          // Sin polígono no filtramos, pero lo avisamos
           alert("Advertencia: no se aplicó el filtro por polígono (GeoJSON no disponible).");
           ingestRows(rows);
         }
