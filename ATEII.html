@@ -6,14 +6,14 @@
 <title>ATEII – Atención actual vs propuesta</title>
 
 <!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- PapaParse (CSV) -->
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-<!-- Turf.js (punto en polígono) -->
-<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js" crossorigin="anonymous"></script>
+<!-- Turf.js (geo utilidades: punto-en-polígono, convex hull, buffer) -->
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
 <style>
   :root{
@@ -53,9 +53,9 @@
     width:44px; height:24px; background:#111827; border:1px solid var(--line); border-radius:999px; position:relative; transition:.2s;
   }
   .knob{ width:20px; height:20px; background:white; border-radius:50%; position:absolute; top:1px; left:1px; transition:.2s; }
-  input#viewToggle{ display:none; }
-  input#viewToggle:checked + .toggle{ background:#16a34a; }
-  input#viewToggle:checked + .toggle .knob{ left:23px; }
+  input[type="checkbox"].toggle-input{ display:none; }
+  input[type="checkbox"].toggle-input:checked + .toggle{ background:#16a34a; }
+  input[type="checkbox"].toggle-input:checked + .toggle .knob{ left:23px; }
   #map{ height: calc(100vh - 92px); }
   .legend{
     position:absolute; bottom:12px; left:12px; z-index:400; background:var(--card);
@@ -77,8 +77,7 @@
   <div style="display:flex; flex-direction:column;">
     <h1>ATEII · Mapa de atención</h1>
     <div class="muted">
-      CSV: <a href="https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv" target="_blank" rel="noopener">Catalogo Sigma (raw)</a> ·
-      GeoJSON: <a href="https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson" target="_blank" rel="noopener">Distritos.geojson</a>
+      CSV: raw GitHub (Catálogo Sigma) · GeoJSON: distritos (RoadMap)
     </div>
   </div>
 
@@ -86,7 +85,7 @@
     <div class="group">
       <label class="switch" title="Cambiar entre Atención actual y Propuesta">
         <span>Actual</span>
-        <input id="viewToggle" type="checkbox" />
+        <input id="viewToggle" class="toggle-input" type="checkbox" />
         <span class="toggle"><span class="knob"></span></span>
         <span>Propuesta</span>
       </label>
@@ -112,7 +111,15 @@
     </div>
 
     <div class="group">
-      <button id="fitBtn" class="btn" title="Ajustar a puntos visibles">Ajustar vista</button>
+      <label class="switch" title="Mostrar/Ocultar marcadores">
+        <span>Marcadores</span>
+        <input id="markersToggle" class="toggle-input" type="checkbox" checked />
+        <span class="toggle"><span class="knob"></span></span>
+      </label>
+    </div>
+
+    <div class="group">
+      <button id="fitBtn" class="btn" title="Ajustar a puntos y zonas visibles">Ajustar vista</button>
     </div>
   </div>
 </header>
@@ -129,34 +136,33 @@
   // ====== Catálogos y configuración ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-  // Distritos a excluir (normalizados; se contemplan con/ sin acentos)
+  // Distritos a excluir (normalizados; contempla acentos/variantes) + exclusión directa por código
   const EXCLUDE_DISTRICTS = new Set([
     "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA","VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
   ].map(s => normalize(s)));
+  const EXCLUDE_CODES = new Set(["11747415"]); // caso señalado
 
-  // Mapeo de letras a nombres (X = Miércoles)
+  // Mapeo días
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
   const dayNameToLetter = { "Lunes":"L", "Martes":"M", "Miércoles":"X", "Jueves":"J", "Viernes":"V", "Sábado":"S" };
 
-  // Colores por día (vista "Actual")
+  // Colores por día (Actual)
   const dayColors = {
-    "Lunes":"#2563eb",     // azul
-    "Martes":"#16a34a",    // verde
-    "Miércoles":"#7c3aed", // morado
-    "Jueves":"#f59e0b",    // naranja
-    "Viernes":"#0ea5e9",   // celeste
-    "Sábado":"#dc2626"     // rojo
+    "Lunes":"#2563eb", "Martes":"#16a34a", "Miércoles":"#7c3aed",
+    "Jueves":"#f59e0b", "Viernes":"#0ea5e9", "Sábado":"#dc2626"
   };
 
   // Propuesta por partes
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
   const partColors = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
+  const partFill =   { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
 
   // ====== Estado UI ======
   let viewMode = "Actual";            // "Actual" | "Propuesta"
   let selectedDay = "Todos";          // "Todos" o nombre de día
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
+  let showMarkers = true;
 
   // ====== Mapa ======
   const map = L.map('map', { preferCanvas:true });
@@ -165,9 +171,12 @@
   }).addTo(map);
 
   // Capas sin clustering
-  let currentLayer = L.layerGroup().addTo(map);
-  let proposedLayer = L.layerGroup();
-  let boundaryLayer = L.geoJSON(null, { style: { color:'#ef4444', weight:1, fill:false } });
+  const currentLayer  = L.layerGroup().addTo(map);
+  const proposedLayer = L.layerGroup();
+  const boundaryLayer = L.geoJSON(null, { style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
+
+  // Polígonos de partes
+  const partPolysLayer = L.layerGroup().addTo(map);
 
   // ====== Datos ======
   let areaFeatures = null; // GeoJSON FeatureCollection
@@ -175,12 +184,10 @@
 
   // ====== Utilitarios ======
   function normalize(s){ return (s ?? "").toString().normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().trim(); }
-  function normalizeName(s){
-    return normalize(s).replace(/\s+/g,' '); // compactar espacios
-  }
+  function normalizeName(s){ return normalize(s).replace(/\s+/g,' '); }
   function num(s){
     if (s == null) return NaN;
-    const t = s.toString().replace(",", "."); // por si viniera coma decimal
+    const t = s.toString().replace(",", ".");
     const v = parseFloat(t);
     return Number.isFinite(v) ? v : NaN;
   }
@@ -219,15 +226,19 @@
         <h4>🎯 Atención actual (dentro del polígono)</h4>
         ${["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"].map(d=>
           `<div class="row"><span class="swatch" style="background:${dayColors[d]}"></span> ${d}</div>`).join("")}
-        <div class="row"><span class="pill">Filtro:</span> <span>${selectedDay}</span></div>
+        <div class="row"><span class="pill">Filtro día:</span> <span>${selectedDay}</span></div>
+        <div class="row"><span class="pill">Marcadores:</span> <span>${showMarkers ? "ON" : "OFF"}</span></div>
       `;
     } else {
+      // conteos por parte según filtros activos
+      const counts = countByPartWithFilters();
       legendEl.innerHTML = `
-        <h4>🧭 Propuesta equilibrada por cantidad (3 zonas oeste→este)</h4>
-        <div class="row"><span class="swatch" style="background:${partColors.A}"></span> Parte A → Lunes &amp; Jueves (LJ)</div>
-        <div class="row"><span class="swatch" style="background:${partColors.B}"></span> Parte B → Martes &amp; Viernes (MV)</div>
-        <div class="row"><span class="swatch" style="background:${partColors.C}"></span> Parte C → Miércoles &amp; Sábado (XS)</div>
-        <div class="row"><span class="pill">Filtro:</span> <span>${selectedDay}</span></div>
+        <h4>🧭 Propuesta equilibrada (3 zonas oeste→este)</h4>
+        <div class="row"><span class="swatch" style="background:${partColors.A}"></span> Parte A → Lunes &amp; Jueves (LJ) <span class="pill">${counts.A} clientes</span></div>
+        <div class="row"><span class="swatch" style="background:${partColors.B}"></span> Parte B → Martes &amp; Viernes (MV) <span class="pill">${counts.B} clientes</span></div>
+        <div class="row"><span class="swatch" style="background:${partColors.C}"></span> Parte C → Miércoles &amp; Sábado (XS) <span class="pill">${counts.C} clientes</span></div>
+        <div class="row"><span class="pill">Filtro día:</span> <span>${selectedDay}</span></div>
+        <div class="row"><span class="pill">Marcadores:</span> <span>${showMarkers ? "ON" : "OFF"}</span></div>
       `;
     }
   }
@@ -235,9 +246,10 @@
   function fitToContent(){
     let bounds = null;
     const layers = [];
-    if (map.hasLayer(currentLayer)) layers.push(currentLayer);
+    if (map.hasLayer(currentLayer))  layers.push(currentLayer);
     if (map.hasLayer(proposedLayer)) layers.push(proposedLayer);
     if (map.hasLayer(boundaryLayer)) layers.push(boundaryLayer);
+    if (map.hasLayer(partPolysLayer)) layers.push(partPolysLayer);
     for (const l of layers){
       const b = l.getBounds?.();
       if (b && b.isValid()){
@@ -269,7 +281,6 @@
 
   // ====== Render de capas (sin clustering) ======
   function refreshLayers(){
-    // limpiar capas
     currentLayer.clearLayers();
     proposedLayer.clearLayers();
 
@@ -277,34 +288,37 @@
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
     const validOffice = (oNorm) => ( (oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri) );
 
-    for (const r of records){
-      if (!validOffice(normalize(r.office))) continue;
+    // Pintar marcadores solo si showMarkers = true
+    if (showMarkers){
+      for (const r of records){
+        if (!validOffice(normalize(r.office))) continue;
 
-      if (viewMode === "Actual"){
-        let passes = (selectedDay === "Todos") ? r.days.length > 0 : r.days.includes(selectedDay);
-        if (!passes) continue;
+        if (viewMode === "Actual"){
+          let passes = (selectedDay === "Todos") ? r.days.length > 0 : r.days.includes(selectedDay);
+          if (!passes) continue;
 
-        const color = (selectedDay === "Todos") ? (dayColors[r.days[0]] || "#6b7280") : (dayColors[selectedDay] || "#6b7280");
+          const color = (selectedDay === "Todos") ? (dayColors[r.days[0]] || "#6b7280") : (dayColors[selectedDay] || "#6b7280");
 
-        const marker = L.circleMarker([r.lat, r.lon], {
-          radius:5.5, stroke:true, weight:1, color:"#0b1221",
-          fillColor: color, fillOpacity:0.95
-        }).bindPopup(buildPopUp(r));
+          const marker = L.circleMarker([r.lat, r.lon], {
+            radius:5.5, stroke:true, weight:1, color:"#0b1221",
+            fillColor: color, fillOpacity:0.95
+          }).bindPopup(buildPopUp(r));
 
-        currentLayer.addLayer(marker);
+          currentLayer.addLayer(marker);
 
-      } else {
-        let passes = (selectedDay === "Todos") ? true : (r.proposedDays?.includes(selectedDay));
-        if (!passes) continue;
+        } else {
+          let passes = (selectedDay === "Todos") ? true : (r.proposedDays?.includes(selectedDay));
+          if (!passes) continue;
 
-        const color = partColors[r.part] || "#6b7280";
+          const color = partColors[r.part] || "#6b7280";
 
-        const marker = L.circleMarker([r.lat, r.lon], {
-          radius:5.5, stroke:true, weight:1, color:"#0b1221",
-          fillColor: color, fillOpacity:0.95
-        }).bindPopup(buildPopUp(r));
+          const marker = L.circleMarker([r.lat, r.lon], {
+            radius:5.5, stroke:true, weight:1, color:"#0b1221",
+            fillColor: color, fillOpacity:0.95
+          }).bindPopup(buildPopUp(r));
 
-        proposedLayer.addLayer(marker);
+          proposedLayer.addLayer(marker);
+        }
       }
     }
 
@@ -317,15 +331,72 @@
       if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
     }
 
+    // Actualizar polígonos de partes (siempre visibles)
+    drawPartPolygons();
+
     renderLegend();
     fitToContent();
   }
 
-  // ====== Balanceo por cantidad (3 partes) ======
-  function assignBalancedPartsByLongitude(){
+  // ====== Conteo por parte con filtros activos (para leyenda propuesta) ======
+  function countByPartWithFilters(){
+    const useAte = filterOffices.has("OFIC ATE");
+    const useChorri = filterOffices.has("OFIC CHORRILLOS");
+    const validOffice = (oNorm) => ( (oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri) );
+    const counts = {A:0, B:0, C:0};
+    for (const r of records){
+      if (!validOffice(normalize(r.office))) continue;
+      if (selectedDay !== "Todos" && !(r.proposedDays?.includes(selectedDay))) continue;
+      if (r.part && counts[r.part] !== undefined) counts[r.part]++;
+    }
+    return counts;
+  }
+
+  // ====== Polígonos por parte (convex hulls) ======
+  function drawPartPolygons(){
+    partPolysLayer.clearLayers();
+
+    const groups = { A:[], B:[], C:[] };
+    for (const r of records){
+      if (!r.part) continue;
+      groups[r.part].push(turf.point([r.lon, r.lat]));
+    }
+
+    Object.keys(groups).forEach(p=>{
+      if (groups[p].length === 0) return;
+      let fc = turf.featureCollection(groups[p]);
+
+      let hull = null;
+      if (groups[p].length >= 3){
+        hull = turf.convex(fc);
+      }
+      if (!hull){
+        // Si no hay suficientes puntos para convex, usar buffer alrededor de la colección
+        const centroid = turf.center(fc);
+        hull = turf.buffer(centroid, 1, {units:"kilometers"}); // círculo de 1km aprox.
+      }
+
+      const color = partColors[p];
+      const fill  = partFill[p];
+      const poly = L.geoJSON(hull, {
+        style: {
+          color: color,
+          weight: 1.2,
+          fillColor: fill,
+          fillOpacity: 0.15
+        }
+      });
+      partPolysLayer.addLayer(poly);
+    });
+  }
+
+  // ====== Balanceo por cantidad (3 partes) + Consolidación por distrito ======
+  function assignBalancedParts(){
+    // 1) Ordenar por longitud (oeste→este) y repartir en 3 por cantidad
     const sorted = [...records].sort((a,b)=>a.lon - b.lon);
     const n = sorted.length;
     if (n === 0) return;
+
     const size = Math.ceil(n / 3);
     const cut1 = size;
     const cut2 = size * 2;
@@ -339,6 +410,28 @@
       r.proposedDays = partToDays[part];
       r.proposedLetters = partToFreqLetters[part];
     }
+
+    // 2) Consolidar por distrito: mover a la parte mayoritaria de su distrito
+    const byDist = new Map(); // distNorm -> {counts: {A,B,C}, majority: 'A'|'B'|'C'}
+    for (const r of records){
+      const d = normalize(r.distrito || "");
+      if (!byDist.has(d)) byDist.set(d, {counts:{A:0,B:0,C:0}});
+      byDist.get(d).counts[r.part] = (byDist.get(d).counts[r.part] || 0) + 1;
+    }
+    for (const [d, obj] of byDist){
+      const entries = Object.entries(obj.counts);
+      const majority = entries.reduce((acc, cur)=> cur[1] > acc[1] ? cur : acc, ["A",0])[0];
+      obj.majority = majority;
+    }
+    for (const r of records){
+      const d = normalize(r.distrito || "");
+      const mj = byDist.get(d)?.majority;
+      if (mj && r.part !== mj){
+        r.part = mj;
+        r.proposedDays = partToDays[mj];
+        r.proposedLetters = partToFreqLetters[mj];
+      }
+    }
   }
 
   // ====== Ingesta del CSV + GeoJSON ======
@@ -350,6 +443,9 @@
     for (let i=startIdx; i<rows.length; i++){
       const row = rows[i];
       if (!row) continue;
+
+      const code = (row[0] ?? "").toString().trim();
+      if (EXCLUDE_CODES.has(code)) continue; // exclusión directa por código
 
       const lat = num(row[28]);
       const lon = num(row[29]);
@@ -367,7 +463,6 @@
       // Excluir ciertos distritos
       if (EXCLUDE_DISTRICTS.has(distNorm)) continue;
 
-      const code = (row[0] ?? "").toString().trim();
       const name = (row[7] ?? "").toString().trim();
       const daysRaw = (row[48] ?? "").toString().trim();
       const days = parseDays(daysRaw);
@@ -377,7 +472,6 @@
     }
 
     // 2) Deduplicación por (nombre normalizado + lat/lon) entre oficinas
-    //    Se conserva el primer registro encontrado (no importa la oficina).
     const seen = new Set();
     const deduped = [];
     for (const r of prelim){
@@ -390,9 +484,9 @@
       deduped.push(r);
     }
 
-    // 3) Guardar y particionar equilibradamente por cantidad
+    // 3) Guardar y particionar (balance + consolidación por distrito)
     records = deduped;
-    assignBalancedPartsByLongitude();
+    assignBalancedParts();
 
     // 4) Pintar
     refreshLayers();
@@ -415,10 +509,18 @@
 
   document.getElementById('oficAte').addEventListener('change', (e)=>{
     if (e.target.checked) filterOffices.add("OFIC ATE"); else filterOffices.delete("OFIC ATE");
+    renderLegend(); // para actualizar ON/OFF y conteos
     refreshLayers();
   });
   document.getElementById('oficChorri').addEventListener('change', (e)=>{
     if (e.target.checked) filterOffices.add("OFIC CHORRILLOS"); else filterOffices.delete("OFIC CHORRILLOS");
+    renderLegend();
+    refreshLayers();
+  });
+
+  document.getElementById('markersToggle').addEventListener('change', (e)=>{
+    showMarkers = e.target.checked;
+    renderLegend();
     refreshLayers();
   });
 
@@ -429,7 +531,7 @@
     .then(r => r.json())
     .then(geo => {
       areaFeatures = geo && geo.type === "FeatureCollection" ? geo : { type:"FeatureCollection", features: [geo] };
-      boundaryLayer.addData(areaFeatures).addTo(map);
+      boundaryLayer.addData(areaFeatures);
       // Centrar al polígono
       try {
         const b = boundaryLayer.getBounds();
