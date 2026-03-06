@@ -6,16 +6,14 @@
 <title>ATEII – Atención actual vs propuesta</title>
 
 <!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- PapaParse (CSV) -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-<!-- MarkerCluster (mejor rendimiento con muchos puntos) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<!-- Turf.js (punto en polígono) -->
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
 <style>
   :root{
@@ -79,10 +77,8 @@
   <div style="display:flex; flex-direction:column;">
     <h1>ATEII · Mapa de atención</h1>
     <div class="muted">
-      Fuente CSV: 
-      <a href="https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv" target="_blank" rel="noopener">
-        Catalogo Sigma (raw)
-      </a>
+      CSV: <a href="https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv" target="_blank" rel="noopener">Catalogo Sigma (raw)</a> ·
+      GeoJSON: <a href="https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson" target="_blank" rel="noopener">Distritos.geojson</a>
     </div>
   </div>
 
@@ -127,24 +123,14 @@
 
 <script>
 (function(){
-  const RAW_URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
+  const CSV_URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
+  // Usamos el RAW del GeoJSON (no el enlace "blob")
+  const GEOJSON_URL = "https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson";
 
   // ====== Catálogos y configuración ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-  // Lista inclusiva de distritos (Lima + Callao) provista por Marco
-  const INCLUDE_DISTRICTS_LIST = [
-    "LIMA","ATE","BARRANCO","BREÑA","CHACLACAYO","CHORRILLOS","CIENEGUILLA","COMAS","EL AGUSTINO",
-    "INDEPENDENCIA","JESUS MARIA","LA MOLINA","LA VICTORIA","LINCE","LOS OLIVOS","LURIGANCHO","LURIN",
-    "MAGDALENA DEL MAR","MAGDALENA VIEJA","MIRAFLORES","PACHACAMAC","PUCUSANA","PUNTA HERMOSA","PUNTA NEGRA",
-    "RIMAC","SAN BARTOLO","SAN BORJA","SAN ISIDRO","SAN JUAN DE LURIGANCHO","SAN JUAN DE MIRAFLORES","SAN LUIS",
-    "SAN MARTIN DE PORRES","SAN MIGUEL","SANTA ANITA","SANTA MARIA DEL MAR","SANTA ROSA","SANTIAGO DE SURCO",
-    "SURQUILLO","VILLA EL SALVADOR","VILLA MARIA DEL TRIUNFO",
-    "CALLAO","BELLAVISTA","CARMEN DE LA LEGUA REYNOSO","LA PERLA","LA PUNTA"
-  ];
-  const INCLUDE_DISTRICTS = new Set(INCLUDE_DISTRICTS_LIST.map(s => normalize(s)));
-
-  // Mapeo de letras a nombres y viceversa (X = Miércoles)
+  // Mapeo de letras a nombres (X = Miércoles)
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
   const dayNameToLetter = { "Lunes":"L", "Martes":"M", "Miércoles":"X", "Jueves":"J", "Viernes":"V", "Sábado":"S" };
 
@@ -158,7 +144,7 @@
     "Sábado":"#dc2626"     // rojo
   };
 
-  // Partición propuesta (longitud terciles)
+  // Propuesta por partes
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
   const partColors = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
@@ -174,13 +160,13 @@
     attribution:'&copy; OpenStreetMap'
   }).addTo(map);
 
-  const clusterOptions = { showCoverageOnHover:false, disableClusteringAtZoom:16, spiderfyOnMaxZoom:true };
-  let currentLayer = L.markerClusterGroup(clusterOptions);
-  let proposedLayer = L.markerClusterGroup(clusterOptions);
-
-  currentLayer.addTo(map);
+  // Capa sin clustering
+  let currentLayer = L.layerGroup().addTo(map);
+  let proposedLayer = L.layerGroup();
+  let boundaryLayer = L.geoJSON(null, { style: { color:'#ef4444', weight:1, fill:false } });
 
   // ====== Datos ======
+  let areaFeatures = null; // GeoJSON FeatureCollection
   let records = []; // {code,distrito,office,daysRaw,days[],freqLetters,lat,lon,part,proposedDays[],proposedLetters}
 
   // ====== Utilitarios ======
@@ -206,25 +192,16 @@
     return Array.from(set);
   }
   function toFreqLetters(dayArr){
-    // Orden canónico L M X J V S
     const order = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
     return order.map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
   }
-  function computeTertiles(vals){
-    if (!vals.length) return {t1:0, t2:0};
-    const s = [...vals].sort((a,b)=>a-b);
-    const q = (p)=>{
-      const pos = (s.length - 1) * p;
-      const base = Math.floor(pos), rest = pos - base;
-      if (s[base+1] !== undefined) return s[base] + rest * (s[base+1] - s[base]);
-      return s[base];
-    };
-    return { t1: q(1/3), t2: q(2/3) };
-  }
-  function assignPart(lon,t1,t2){
-    if (lon <= t1) return "A";  // Oeste
-    if (lon <= t2) return "B";  // Centro
-    return "C";                 // Este
+  function pointInsideArea(lat, lon){
+    if (!areaFeatures) return false;
+    const pt = turf.point([lon, lat]);
+    for (const f of areaFeatures.features){
+      if (turf.booleanPointInPolygon(pt, f)) return true;
+    }
+    return false;
   }
 
   // ====== Leyenda ======
@@ -232,14 +209,14 @@
   function renderLegend(){
     if (viewMode === "Actual") {
       legendEl.innerHTML = `
-        <h4>🎯 Atención actual</h4>
+        <h4>🎯 Atención actual (dentro del polígono)</h4>
         ${["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"].map(d=>
           `<div class="row"><span class="swatch" style="background:${dayColors[d]}"></span> ${d}</div>`).join("")}
         <div class="row"><span class="pill">Filtro:</span> <span>${selectedDay}</span></div>
       `;
     } else {
       legendEl.innerHTML = `
-        <h4>🧭 Atención propuesta (3 zonas por longitud)</h4>
+        <h4>🧭 Propuesta equilibrada por cantidad (3 zonas oeste→este)</h4>
         <div class="row"><span class="swatch" style="background:${partColors.A}"></span> Parte A → Lunes &amp; Jueves (LJ)</div>
         <div class="row"><span class="swatch" style="background:${partColors.B}"></span> Parte B → Martes &amp; Viernes (MV)</div>
         <div class="row"><span class="swatch" style="background:${partColors.C}"></span> Parte C → Miércoles &amp; Sábado (XS)</div>
@@ -248,9 +225,19 @@
     }
   }
 
-  function fitToLayer(layer){
-    const bounds = layer.getBounds();
-    if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.1));
+  function fitToContent(){
+    let bounds = null;
+    const layers = [];
+    if (map.hasLayer(currentLayer)) layers.push(currentLayer);
+    if (map.hasLayer(proposedLayer)) layers.push(proposedLayer);
+    if (map.hasLayer(boundaryLayer)) layers.push(boundaryLayer);
+    for (const l of layers){
+      const b = l.getBounds?.();
+      if (b && b.isValid()){
+        bounds = bounds ? bounds.extend(b) : b;
+      }
+    }
+    if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.08));
     else map.setView([-12.0464, -77.0428], 10);
   }
 
@@ -272,12 +259,11 @@
     `;
   }
 
-  // ====== Render de capas ======
+  // ====== Render de capas (sin clustering) ======
   function refreshLayers(){
-    map.removeLayer(currentLayer);
-    map.removeLayer(proposedLayer);
-    currentLayer = L.markerClusterGroup(clusterOptions);
-    proposedLayer = L.markerClusterGroup(clusterOptions);
+    // limpiar capas
+    currentLayer.clearLayers();
+    proposedLayer.clearLayers();
 
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -287,44 +273,67 @@
       if (!validOffice(normalize(r.office))) continue;
 
       if (viewMode === "Actual"){
-        // Filtro por día en la frecuencia actual
         let passes = (selectedDay === "Todos") ? r.days.length > 0 : r.days.includes(selectedDay);
         if (!passes) continue;
 
-        // Color: si “Todos”, usa el 1er día; si no, el color del seleccionado
-        const baseColor = (selectedDay === "Todos") ? (dayColors[r.days[0]] || "#6b7280") : (dayColors[selectedDay] || "#6b7280");
+        const color = (selectedDay === "Todos") ? (dayColors[r.days[0]] || "#6b7280") : (dayColors[selectedDay] || "#6b7280");
 
         const marker = L.circleMarker([r.lat, r.lon], {
-          radius:6, stroke:true, weight:1, color:"#0b1221",
-          fillColor: baseColor, fillOpacity:0.9
+          radius:5.5, stroke:true, weight:1, color:"#0b1221",
+          fillColor: color, fillOpacity:0.95
         }).bindPopup(buildPopUp(r));
+
         currentLayer.addLayer(marker);
 
       } else {
-        // Filtro por día en la frecuencia propuesta
         let passes = (selectedDay === "Todos") ? true : (r.proposedDays?.includes(selectedDay));
         if (!passes) continue;
 
         const color = partColors[r.part] || "#6b7280";
+
         const marker = L.circleMarker([r.lat, r.lon], {
-          radius:6, stroke:true, weight:1, color:"#0b1221",
-          fillColor: color, fillOpacity:0.9
+          radius:5.5, stroke:true, weight:1, color:"#0b1221",
+          fillColor: color, fillOpacity:0.95
         }).bindPopup(buildPopUp(r));
+
         proposedLayer.addLayer(marker);
       }
     }
 
+    // alternar capa visible
     if (viewMode === "Actual"){
-      currentLayer.addTo(map);
-      fitToLayer(currentLayer);
+      if (!map.hasLayer(currentLayer)) currentLayer.addTo(map);
+      if (map.hasLayer(proposedLayer)) map.removeLayer(proposedLayer);
     } else {
-      proposedLayer.addTo(map);
-      fitToLayer(proposedLayer);
+      if (!map.hasLayer(proposedLayer)) proposedLayer.addTo(map);
+      if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
     }
+
     renderLegend();
+    fitToContent();
   }
 
-  // ====== Ingesta del CSV ======
+  // ====== Balanceo por cantidad (3 partes) ======
+  function assignBalancedPartsByLongitude(){
+    const sorted = [...records].sort((a,b)=>a.lon - b.lon);
+    const n = sorted.length;
+    if (n === 0) return;
+    const size = Math.ceil(n / 3);
+    const cut1 = size;
+    const cut2 = size * 2;
+
+    for (let i=0; i<n; i++){
+      const r = sorted[i];
+      let part = "C";
+      if (i < cut1) part = "A";
+      else if (i < cut2) part = "B";
+      r.part = part;
+      r.proposedDays = partToDays[part];
+      r.proposedLetters = partToFreqLetters[part];
+    }
+  }
+
+  // ====== Ingesta del CSV + GeoJSON ======
   function ingestRows(rows){
     records = [];
     const startIdx = hasHeader(rows[0]) ? 1 : 0;
@@ -340,10 +349,10 @@
       const officeNorm = normalize(office);
       if (!OFFICES.has(officeNorm)) continue;
 
-      const distrito = (row[17] ?? "").toString().trim();
-      const distNorm = normalize(distrito);
-      if (!INCLUDE_DISTRICTS.has(distNorm)) continue; // <<— Solo distritos de la lista
+      // Solo clientes dentro del polígono
+      if (!pointInsideArea(lat, lon)) continue;
 
+      const distrito = (row[17] ?? "").toString().trim();
       const code = (row[0] ?? "").toString().trim();
       const daysRaw = (row[48] ?? "").toString().trim();
       const days = parseDays(daysRaw);
@@ -352,24 +361,10 @@
       records.push({ code, distrito, office, daysRaw, days, freqLetters, lat, lon });
     }
 
-    // Partición por longitudes: terciles → A (oeste), B (centro), C (este)
-    const longitudes = records.map(r=>r.lon);
-    const {t1, t2} = computeTertiles(longitudes);
-    for (const r of records){
-      r.part = assignPart(r.lon, t1, t2);
-      r.proposedDays = partToDays[r.part] || [];
-      r.proposedLetters = partToFreqLetters[r.part] || "";
-    }
+    // Balancear por cantidad → A/B/C
+    assignBalancedPartsByLongitude();
 
-    // Centrar mapa
-    if (records.length){
-      const meanLat = records.reduce((a,r)=>a+r.lat,0)/records.length;
-      const meanLon = records.reduce((a,r)=>a+r.lon,0)/records.length;
-      map.setView([meanLat, meanLon], 11);
-    } else {
-      map.setView([-12.0464, -77.0428], 10);
-    }
-
+    // Pintar
     refreshLayers();
   }
 
@@ -398,29 +393,58 @@
     refreshLayers();
   });
 
-  document.getElementById('fitBtn').addEventListener('click', ()=>{
-    if (viewMode === "Actual") fitToLayer(currentLayer);
-    else fitToLayer(proposedLayer);
-  });
+  document.getElementById('fitBtn').addEventListener('click', fitToContent);
 
-  // ====== Carga CSV ======
-  Papa.parse(RAW_URL, {
-    download:true,
-    dynamicTyping:false,
-    skipEmptyLines:true,
-    complete: (results) => {
-      const rows = results.data;
-      if (!rows || !rows.length){
-        alert("No se pudo leer el CSV o está vacío.");
-        return;
-      }
-      ingestRows(rows);
-    },
-    error: (err) => {
-      console.error(err);
-      alert("Error al descargar o parsear el CSV.");
-    }
-  });
+  // ====== Carga GeoJSON + CSV ======
+  fetch(GEOJSON_URL)
+    .then(r => r.json())
+    .then(geo => {
+      areaFeatures = geo && geo.type === "FeatureCollection" ? geo : { type:"FeatureCollection", features: [geo] };
+      boundaryLayer.addData(areaFeatures).addTo(map);
+      // Centrar de inicio al polígono
+      try {
+        const b = boundaryLayer.getBounds();
+        if (b && b.isValid()) map.fitBounds(b.pad(0.05));
+      } catch(e){}
+      // Luego cargar CSV
+      Papa.parse(CSV_URL, {
+        download:true,
+        dynamicTyping:false,
+        skipEmptyLines:true,
+        complete: (results) => {
+          const rows = results.data;
+          if (!rows || !rows.length){
+            alert("No se pudo leer el CSV o está vacío.");
+            return;
+          }
+          ingestRows(rows);
+        },
+        error: (err) => {
+          console.error(err);
+          alert("Error al descargar o parsear el CSV.");
+        }
+      });
+    })
+    .catch(err => {
+      console.error("No se pudo cargar el GeoJSON:", err);
+      alert("No se pudo cargar el GeoJSON de límites.");
+      // Aun así intentamos cargar CSV
+      Papa.parse(CSV_URL, {
+        download:true,
+        dynamicTyping:false,
+        skipEmptyLines:true,
+        complete: (results) => {
+          const rows = results.data;
+          if (!rows || !rows.length){
+            alert("No se pudo leer el CSV o está vacío.");
+            return;
+          }
+          // Sin polígono no filtramos, pero lo avisamos
+          alert("Advertencia: no se aplicó el filtro por polígono (GeoJSON no disponible).");
+          ingestRows(rows);
+        }
+      });
+    });
 
 })();
 </script>
