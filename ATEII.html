@@ -6,13 +6,13 @@
 <title>ATEII – Atención actual vs propuesta</title>
 
 <!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- PapaParse (CSV) -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-<!-- Turf.js (geo utilidades: punto-en-polígono, convex hull, buffer) -->
+<!-- Turf.js (geo utilidades) -->
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
 <style>
@@ -32,7 +32,7 @@
     padding:10px 14px; border-bottom:1px solid var(--line);
     display:flex; gap:14px; align-items:center; flex-wrap:wrap;
     background:linear-gradient(180deg, #0b1221 0%, #0f172a 100%);
-    position:sticky; top:0; z-index:500;
+    position:sticky; top:0; z-index:1000;
   }
   h1{ font-size:16px; margin:0; letter-spacing:.2px; }
   .muted{ color:var(--muted); font-size:12px; }
@@ -58,7 +58,7 @@
   input[type="checkbox"].toggle-input:checked + .toggle .knob{ left:23px; }
   #map{ height: calc(100vh - 92px); }
   .legend{
-    position:absolute; bottom:12px; left:12px; z-index:400; background:var(--card);
+    position:absolute; bottom:12px; left:12px; z-index:600; background:var(--card);
     border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px;
   }
   .legend h4{ margin:0 0 6px 0; font-size:13px; }
@@ -119,6 +119,14 @@
     </div>
 
     <div class="group">
+      <label class="switch" title="Avenidas como referencia (beta)">
+        <span>Avenidas (beta)</span>
+        <input id="avenidasToggle" class="toggle-input" type="checkbox" />
+        <span class="toggle"><span class="knob"></span></span>
+      </label>
+    </div>
+
+    <div class="group">
       <button id="fitBtn" class="btn" title="Ajustar a puntos y zonas visibles">Ajustar vista</button>
     </div>
   </div>
@@ -136,11 +144,11 @@
   // ====== Catálogos y configuración ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-  // Distritos a excluir (normalizados; contempla acentos/variantes) + exclusión directa por código
+  // Excluir distritos (normalizados) + exclusión directa por código (caso Mi Perú)
   const EXCLUDE_DISTRICTS = new Set([
     "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA","VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
   ].map(s => normalize(s)));
-  const EXCLUDE_CODES = new Set(["11747415"]); // caso señalado
+  const EXCLUDE_CODES = new Set(["11747415"]);
 
   // Mapeo días
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
@@ -158,25 +166,38 @@
   const partColors = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
   const partFill =   { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
 
+  // Avenidas (beta): edita esta lista si quieres forzar ejes específicos
+  const AVENIDAS_KEYWORDS = [
+    // Ejemplos: "Panamericana", "Evitamiento", "Universitaria", "Javier Prado"
+    // Agrega aquí los ejes que quieras usar como referencia
+  ];
+  const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
+
   // ====== Estado UI ======
   let viewMode = "Actual";            // "Actual" | "Propuesta"
   let selectedDay = "Todos";          // "Todos" o nombre de día
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   let showMarkers = true;
+  let showAvenidas = false;
 
-  // ====== Mapa ======
+  // ====== Mapa y PANES (orden de dibujo) ======
   const map = L.map('map', { preferCanvas:true });
+
+  // Panes: zonas (debajo), avenidas (medio), marcadores (encima)
+  map.createPane('zonesPane');      map.getPane('zonesPane').style.zIndex = 300;
+  map.createPane('avenidasPane');   map.getPane('avenidasPane').style.zIndex = 400;
+  map.createPane('markersPane');    map.getPane('markersPane').style.zIndex = 600;
+
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution:'&copy; OpenStreetMap'
   }).addTo(map);
 
-  // Capas sin clustering
-  const currentLayer  = L.layerGroup().addTo(map);
-  const proposedLayer = L.layerGroup();
-  const boundaryLayer = L.geoJSON(null, { style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
-
-  // Polígonos de partes
-  const partPolysLayer = L.layerGroup().addTo(map);
+  // Capas
+  const currentLayer  = L.layerGroup().addTo(map);   // markers actuales (pane markers)
+  const proposedLayer = L.layerGroup();              // markers propuestos (pane markers)
+  const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
+  const partPolysLayer = L.layerGroup().addTo(map);  // polígonos de partes (pane zones)
+  const avenidasLayer  = L.layerGroup();             // líneas de avenidas (pane avenidas)
 
   // ====== Datos ======
   let areaFeatures = null; // GeoJSON FeatureCollection
@@ -217,6 +238,24 @@
     }
     return false;
   }
+  function largestPolygon(feature){
+    // Devuelve la geometría con el polígono (o multipolígono reducido) de mayor área
+    if (!feature) return null;
+    let geom = feature.geometry;
+    if (!geom) return feature;
+    if (geom.type === 'Polygon') return feature;
+
+    if (geom.type === 'MultiPolygon'){
+      let maxA = -1, best = null;
+      for (const coords of geom.coordinates){
+        const poly = turf.polygon(coords, feature.properties || {});
+        const a = turf.area(poly);
+        if (a > maxA){ maxA = a; best = poly; }
+      }
+      return best;
+    }
+    return feature;
+  }
 
   // ====== Leyenda ======
   const legendEl = document.getElementById('legend');
@@ -230,7 +269,6 @@
         <div class="row"><span class="pill">Marcadores:</span> <span>${showMarkers ? "ON" : "OFF"}</span></div>
       `;
     } else {
-      // conteos por parte según filtros activos
       const counts = countByPartWithFilters();
       legendEl.innerHTML = `
         <h4>🧭 Propuesta equilibrada (3 zonas oeste→este)</h4>
@@ -239,6 +277,7 @@
         <div class="row"><span class="swatch" style="background:${partColors.C}"></span> Parte C → Miércoles &amp; Sábado (XS) <span class="pill">${counts.C} clientes</span></div>
         <div class="row"><span class="pill">Filtro día:</span> <span>${selectedDay}</span></div>
         <div class="row"><span class="pill">Marcadores:</span> <span>${showMarkers ? "ON" : "OFF"}</span></div>
+        <div class="row"><span class="pill">Avenidas:</span> <span>${showAvenidas ? "ON" : "OFF"}</span></div>
       `;
     }
   }
@@ -250,6 +289,7 @@
     if (map.hasLayer(proposedLayer)) layers.push(proposedLayer);
     if (map.hasLayer(boundaryLayer)) layers.push(boundaryLayer);
     if (map.hasLayer(partPolysLayer)) layers.push(partPolysLayer);
+    if (map.hasLayer(avenidasLayer))  layers.push(avenidasLayer);
     for (const l of layers){
       const b = l.getBounds?.();
       if (b && b.isValid()){
@@ -279,7 +319,7 @@
     `;
   }
 
-  // ====== Render de capas (sin clustering) ======
+  // ====== Render de capas (markers abajo/arriba según pane) ======
   function refreshLayers(){
     currentLayer.clearLayers();
     proposedLayer.clearLayers();
@@ -288,7 +328,6 @@
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
     const validOffice = (oNorm) => ( (oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri) );
 
-    // Pintar marcadores solo si showMarkers = true
     if (showMarkers){
       for (const r of records){
         if (!validOffice(normalize(r.office))) continue;
@@ -296,10 +335,10 @@
         if (viewMode === "Actual"){
           let passes = (selectedDay === "Todos") ? r.days.length > 0 : r.days.includes(selectedDay);
           if (!passes) continue;
-
           const color = (selectedDay === "Todos") ? (dayColors[r.days[0]] || "#6b7280") : (dayColors[selectedDay] || "#6b7280");
 
           const marker = L.circleMarker([r.lat, r.lon], {
+            pane:'markersPane',
             radius:5.5, stroke:true, weight:1, color:"#0b1221",
             fillColor: color, fillOpacity:0.95
           }).bindPopup(buildPopUp(r));
@@ -309,10 +348,10 @@
         } else {
           let passes = (selectedDay === "Todos") ? true : (r.proposedDays?.includes(selectedDay));
           if (!passes) continue;
-
           const color = partColors[r.part] || "#6b7280";
 
           const marker = L.circleMarker([r.lat, r.lon], {
+            pane:'markersPane',
             radius:5.5, stroke:true, weight:1, color:"#0b1221",
             fillColor: color, fillOpacity:0.95
           }).bindPopup(buildPopUp(r));
@@ -331,14 +370,18 @@
       if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
     }
 
-    // Actualizar polígonos de partes (siempre visibles)
+    // Actualizar polígonos de partes (siempre por debajo)
     drawPartPolygons();
+
+    // Avenidas (beta)
+    if (showAvenidas) { if (!map.hasLayer(avenidasLayer)) avenidasLayer.addTo(map); }
+    else { if (map.hasLayer(avenidasLayer)) map.removeLayer(avenidasLayer); }
 
     renderLegend();
     fitToContent();
   }
 
-  // ====== Conteo por parte con filtros activos (para leyenda propuesta) ======
+  // ====== Conteo por parte (leyenda propuesta) ======
   function countByPartWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -352,41 +395,63 @@
     return counts;
   }
 
-  // ====== Polígonos por parte (convex hulls) ======
+  // ====== Polígonos por parte (convex hull) SIN solapes ni “lunares” ======
   function drawPartPolygons(){
     partPolysLayer.clearLayers();
 
+    // 1) Agrupar puntos por parte
     const groups = { A:[], B:[], C:[] };
-    for (const r of records){
-      if (!r.part) continue;
-      groups[r.part].push(turf.point([r.lon, r.lat]));
+    for (const r of records) if (r.part) groups[r.part].push(turf.point([r.lon, r.lat]));
+
+    // 2) Hull por grupo (o buffer si pocos puntos)
+    const hulls = {};
+    ["A","B","C"].forEach(p=>{
+      const pts = groups[p];
+      if (!pts || pts.length === 0) return;
+      const fc = turf.featureCollection(pts);
+      let hull = null;
+      if (pts.length >= 3) hull = turf.convex(fc);
+      if (!hull){
+        const centroid = turf.center(fc);
+        hull = turf.buffer(centroid, 1, {units:"kilometers"});
+      }
+      hulls[p] = hull;
+    });
+
+    // 3) Orden oeste→este por la x del centroide
+    const order = Object.keys(hulls).sort((p1,p2)=>{
+      const c1 = turf.center(hulls[p1]).geometry.coordinates[0];
+      const c2 = turf.center(hulls[p2]).geometry.coordinates[0];
+      return c1 - c2;
+    });
+
+    // 4) Quitar solapes en cascada (A, luego B\A, luego C\(A∪B))
+    const result = {};
+    let unionPrev = null;
+    for (const p of order){
+      let poly = hulls[p];
+      if (unionPrev){
+        const diff = turf.difference(poly, unionPrev);
+        if (diff) poly = diff;
+      }
+      // quita “lunares”: conserva solo el polígono de mayor área
+      poly = largestPolygon(poly);
+      result[p] = poly;
+      unionPrev = unionPrev ? turf.union(unionPrev, poly) : poly;
     }
 
-    Object.keys(groups).forEach(p=>{
-      if (groups[p].length === 0) return;
-      let fc = turf.featureCollection(groups[p]);
-
-      let hull = null;
-      if (groups[p].length >= 3){
-        hull = turf.convex(fc);
-      }
-      if (!hull){
-        // Si no hay suficientes puntos para convex, usar buffer alrededor de la colección
-        const centroid = turf.center(fc);
-        hull = turf.buffer(centroid, 1, {units:"kilometers"}); // círculo de 1km aprox.
-      }
-
-      const color = partColors[p];
-      const fill  = partFill[p];
-      const poly = L.geoJSON(hull, {
+    // 5) Pintar (si existe)
+    ["A","B","C"].forEach(p=>{
+      if (!result[p]) return;
+      L.geoJSON(result[p], {
+        pane:'zonesPane',
         style: {
-          color: color,
+          color: partColors[p],
           weight: 1.2,
-          fillColor: fill,
+          fillColor: partFill[p],
           fillOpacity: 0.15
         }
-      });
-      partPolysLayer.addLayer(poly);
+      }).addTo(partPolysLayer);
     });
   }
 
@@ -411,7 +476,7 @@
       r.proposedLetters = partToFreqLetters[part];
     }
 
-    // 2) Consolidar por distrito: mover a la parte mayoritaria de su distrito
+    // 2) Consolidar por distrito hacia su parte mayoritaria (reduce “lunares”)
     const byDist = new Map(); // distNorm -> {counts: {A,B,C}, majority: 'A'|'B'|'C'}
     for (const r of records){
       const d = normalize(r.distrito || "");
@@ -438,14 +503,14 @@
   function ingestRows(rows){
     const startIdx = hasHeader(rows[0]) ? 1 : 0;
 
-    // 1) Filtrado base y armado preliminar
+    // 1) Filtrado base
     const prelim = [];
     for (let i=startIdx; i<rows.length; i++){
       const row = rows[i];
       if (!row) continue;
 
       const code = (row[0] ?? "").toString().trim();
-      if (EXCLUDE_CODES.has(code)) continue; // exclusión directa por código
+      if (EXCLUDE_CODES.has(code)) continue;
 
       const lat = num(row[28]);
       const lon = num(row[29]);
@@ -460,7 +525,6 @@
 
       const distrito = (row[17] ?? "").toString().trim();
       const distNorm = normalize(distrito);
-      // Excluir ciertos distritos
       if (EXCLUDE_DISTRICTS.has(distNorm)) continue;
 
       const name = (row[7] ?? "").toString().trim();
@@ -471,7 +535,7 @@
       prelim.push({ code, name, distrito, office, daysRaw, days, freqLetters, lat, lon });
     }
 
-    // 2) Deduplicación por (nombre normalizado + lat/lon) entre oficinas
+    // 2) Deduplicación por (nombre normalizado + lat/lon)
     const seen = new Set();
     const deduped = [];
     for (const r of prelim){
@@ -484,12 +548,62 @@
       deduped.push(r);
     }
 
-    // 3) Guardar y particionar (balance + consolidación por distrito)
     records = deduped;
+
+    // 3) Particionar (balance + consolidación por distrito)
     assignBalancedParts();
 
     // 4) Pintar
     refreshLayers();
+  }
+
+  // ====== Avenidas (beta) – visualización y base para delimitación por ejes ======
+  async function loadAvenidas(){
+    avenidasLayer.clearLayers();
+    if (!showAvenidas || AVENIDAS_KEYWORDS.length === 0) return;
+
+    // Tomamos el bounding box del polígono de distritos para acotar la consulta
+    const b = boundaryLayer.getBounds();
+    if (!b || !b.isValid()) return;
+    const south = b.getSouth(), west = b.getWest(), north = b.getNorth(), east = b.getEast();
+
+    // Overpass QL: buscar highways con nombres que contengan los keywords
+    const nameRegex = AVENIDAS_KEYWORDS.map(k => `~"${k}"`).join("|"); // no usado directamente para evitar errores
+    // Construimos varias consultas OR
+    const nameFilters = AVENIDAS_KEYWORDS.map(k => `way["highway"]["name"~"${k}", i](${south},${west},${north},${east});`).join("\n");
+
+    const q = `
+      [out:json][timeout:25];
+      (
+        ${nameFilters}
+      );
+      out geom;
+    `;
+
+    try{
+      const res = await fetch(OVERPASS_ENDPOINT, { method:"POST", body:q, headers:{ "Content-Type":"text/plain" }});
+      const data = await res.json();
+      const features = [];
+      if (data && data.elements){
+        for (const el of data.elements){
+          if (el.type === "way" && el.geometry){
+            const coords = el.geometry.map(g => [g.lon, g.lat]);
+            features.push({
+              type:"Feature",
+              properties: { name: el.tags?.name || "Avenida", highway: el.tags?.highway || "" },
+              geometry:{ type:"LineString", coordinates: coords }
+            });
+          }
+        }
+      }
+      const gj = { type:"FeatureCollection", features };
+      L.geoJSON(gj, {
+        pane:'avenidasPane',
+        style: { color:'#fbbf24', weight:3, opacity:0.8 } // amarillo
+      }).addTo(avenidasLayer);
+    }catch(e){
+      console.error("Overpass falló o no devolvió datos:", e);
+    }
   }
 
   // ====== Eventos UI ======
@@ -509,7 +623,7 @@
 
   document.getElementById('oficAte').addEventListener('change', (e)=>{
     if (e.target.checked) filterOffices.add("OFIC ATE"); else filterOffices.delete("OFIC ATE");
-    renderLegend(); // para actualizar ON/OFF y conteos
+    renderLegend();
     refreshLayers();
   });
   document.getElementById('oficChorri').addEventListener('change', (e)=>{
@@ -521,6 +635,12 @@
   document.getElementById('markersToggle').addEventListener('change', (e)=>{
     showMarkers = e.target.checked;
     renderLegend();
+    refreshLayers();
+  });
+
+  document.getElementById('avenidasToggle').addEventListener('change', async (e)=>{
+    showAvenidas = e.target.checked;
+    if (showAvenidas) await loadAvenidas();
     refreshLayers();
   });
 
