@@ -6,24 +6,15 @@
 <title>ATEII – Atención actual vs propuesta</title>
 
 <!-- Leaflet -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- PapaParse (CSV) -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-<!-- MarkerCluster (opcional para rendimiento) -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
-/>
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
-/>
+<!-- MarkerCluster (mejor rendimiento con muchos puntos) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <style>
@@ -67,7 +58,7 @@
   input#viewToggle{ display:none; }
   input#viewToggle:checked + .toggle{ background:#16a34a; }
   input#viewToggle:checked + .toggle .knob{ left:23px; }
-  #map{ height: calc(100vh - 88px); }
+  #map{ height: calc(100vh - 92px); }
   .legend{
     position:absolute; bottom:12px; left:12px; z-index:400; background:var(--card);
     border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px;
@@ -79,6 +70,7 @@
   a, a:visited{ color:#93c5fd; text-decoration:none; }
   a:hover{ text-decoration:underline; }
   .btn{ padding:6px 10px; border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:8px; cursor:pointer;}
+  .freq{ display:inline-block; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-weight:700; font-size:12px; background:#0b1221; color:#c7d2fe; padding:2px 6px; border-radius:6px; border:1px solid #111827;}
 </style>
 </head>
 <body>
@@ -86,13 +78,18 @@
 <header>
   <div style="display:flex; flex-direction:column;">
     <h1>ATEII · Mapa de atención</h1>
-    <div class="muted">Fuente: <a href="https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv" target="_blank">Catalogo Sigma.csv (raw)</a></div>
+    <div class="muted">
+      Fuente CSV: 
+      <a href="https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv" target="_blank" rel="noopener">
+        Catalogo Sigma (raw)
+      </a>
+    </div>
   </div>
 
   <div class="controls">
     <div class="group">
       <label class="switch" title="Cambiar entre Atención actual y Propuesta">
-        <span id="viewLabel">Actual</span>
+        <span>Actual</span>
         <input id="viewToggle" type="checkbox" />
         <span class="toggle"><span class="knob"></span></span>
         <span>Propuesta</span>
@@ -132,11 +129,22 @@
 (function(){
   const RAW_URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
 
-  // Configuración y catálogos
+  // ====== Catálogos y configuración ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
-  const EXCLUDE_DISTRICTS = new Set(["ANCON","ANCÓN","CARABAYLLO","VENTANILLA","PUENTE PIEDRA","MI PERU","MI PERÚ"]
-                                    .values ? ["ANCON","ANCÓN","CARABAYLLO","VENTANILLA","PUENTE PIEDRA","MI PERU","MI PERÚ"] : []); // fallback
-  // Mapeo de siglas a nombres de días (X = Miércoles)
+
+  // Lista inclusiva de distritos (Lima + Callao) provista por Marco
+  const INCLUDE_DISTRICTS_LIST = [
+    "LIMA","ATE","BARRANCO","BREÑA","CHACLACAYO","CHORRILLOS","CIENEGUILLA","COMAS","EL AGUSTINO",
+    "INDEPENDENCIA","JESUS MARIA","LA MOLINA","LA VICTORIA","LINCE","LOS OLIVOS","LURIGANCHO","LURIN",
+    "MAGDALENA DEL MAR","MAGDALENA VIEJA","MIRAFLORES","PACHACAMAC","PUCUSANA","PUNTA HERMOSA","PUNTA NEGRA",
+    "RIMAC","SAN BARTOLO","SAN BORJA","SAN ISIDRO","SAN JUAN DE LURIGANCHO","SAN JUAN DE MIRAFLORES","SAN LUIS",
+    "SAN MARTIN DE PORRES","SAN MIGUEL","SANTA ANITA","SANTA MARIA DEL MAR","SANTA ROSA","SANTIAGO DE SURCO",
+    "SURQUILLO","VILLA EL SALVADOR","VILLA MARIA DEL TRIUNFO",
+    "CALLAO","BELLAVISTA","CARMEN DE LA LEGUA REYNOSO","LA PERLA","LA PUNTA"
+  ];
+  const INCLUDE_DISTRICTS = new Set(INCLUDE_DISTRICTS_LIST.map(s => normalize(s)));
+
+  // Mapeo de letras a nombres y viceversa (X = Miércoles)
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
   const dayNameToLetter = { "Lunes":"L", "Martes":"M", "Miércoles":"X", "Jueves":"J", "Viernes":"V", "Sábado":"S" };
 
@@ -150,16 +158,17 @@
     "Sábado":"#dc2626"     // rojo
   };
 
-  // Partición propuesta (longitud tertiles) y colores por parte
+  // Partición propuesta (longitud terciles)
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
+  const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
   const partColors = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
 
-  // Estado UI
+  // ====== Estado UI ======
   let viewMode = "Actual";            // "Actual" | "Propuesta"
   let selectedDay = "Todos";          // "Todos" o nombre de día
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-  // Mapa
+  // ====== Mapa ======
   const map = L.map('map', { preferCanvas:true });
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution:'&copy; OpenStreetMap'
@@ -169,57 +178,58 @@
   let currentLayer = L.markerClusterGroup(clusterOptions);
   let proposedLayer = L.markerClusterGroup(clusterOptions);
 
-  currentLayer.addTo(map); // capa inicial
+  currentLayer.addTo(map);
 
-  // Datos
-  let records = []; // {code,distrito,office,daysRaw,days[],lat,lon,part}
+  // ====== Datos ======
+  let records = []; // {code,distrito,office,daysRaw,days[],freqLetters,lat,lon,part,proposedDays[],proposedLetters}
 
-  // Utilitarios
-  const normalize = (s) => (s ?? "").toString().normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().trim();
-  const num = (s) => {
+  // ====== Utilitarios ======
+  function normalize(s){ return (s ?? "").toString().normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().trim(); }
+  function num(s){
     if (s == null) return NaN;
     const t = s.toString().replace(",", "."); // por si viniera coma decimal
     const v = parseFloat(t);
     return Number.isFinite(v) ? v : NaN;
-  };
-  const hasHeader = (row) => {
+  }
+  function hasHeader(row){
     const a = num(row[28]), b = num(row[29]);
-    // Consideramos cabecera si no son números o si contienen textos típicos
     const t28 = (row[28] ?? "").toString().toLowerCase();
     const t29 = (row[29] ?? "").toString().toLowerCase();
     if (!Number.isFinite(a) || !Number.isFinite(b)) return true;
     if (t28.includes("lat") || t29.includes("lon")) return true;
     return false;
-  };
-  const parseDays = (raw) => {
+  }
+  function parseDays(raw){
     const s = (raw ?? "").toString().toUpperCase().replace(/[^LMXJVS]/g,"");
-    const out = new Set();
-    for (const ch of s) {
-      const name = dayLetterToName[ch];
-      if (name) out.add(name);
-    }
-    return Array.from(out);
-  };
-  const computeTertiles = (arr) => {
-    if (arr.length === 0) return {t1:0, t2:0};
-    const sorted = [...arr].sort((a,b)=>a-b);
-    const q = (p)=> {
-      const pos = (sorted.length - 1) * p;
+    const set = new Set();
+    for (const ch of s) if (dayLetterToName[ch]) set.add(dayLetterToName[ch]);
+    return Array.from(set);
+  }
+  function toFreqLetters(dayArr){
+    // Orden canónico L M X J V S
+    const order = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+    return order.map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
+  }
+  function computeTertiles(vals){
+    if (!vals.length) return {t1:0, t2:0};
+    const s = [...vals].sort((a,b)=>a-b);
+    const q = (p)=>{
+      const pos = (s.length - 1) * p;
       const base = Math.floor(pos), rest = pos - base;
-      if (sorted[base+1] !== undefined) return sorted[base] + rest * (sorted[base+1] - sorted[base]);
-      return sorted[base];
+      if (s[base+1] !== undefined) return s[base] + rest * (s[base+1] - s[base]);
+      return s[base];
     };
     return { t1: q(1/3), t2: q(2/3) };
-  };
-  const assignPart = (lon, t1, t2) => {
-    // longitudes más negativas = más al oeste
-    if (lon <= t1) return "A";       // Oeste
-    if (lon <= t2) return "B";       // Centro
-    return "C";                      // Este
-  };
+  }
+  function assignPart(lon,t1,t2){
+    if (lon <= t1) return "A";  // Oeste
+    if (lon <= t2) return "B";  // Centro
+    return "C";                 // Este
+  }
 
+  // ====== Leyenda ======
   const legendEl = document.getElementById('legend');
-  const renderLegend = () => {
+  function renderLegend(){
     if (viewMode === "Actual") {
       legendEl.innerHTML = `
         <h4>🎯 Atención actual</h4>
@@ -229,42 +239,41 @@
       `;
     } else {
       legendEl.innerHTML = `
-        <h4>🧭 Atención propuesta (partición en 3)</h4>
-        <div class="row"><span class="swatch" style="background:${partColors.A}"></span> Parte A → Lunes & Jueves</div>
-        <div class="row"><span class="swatch" style="background:${partColors.B}"></span> Parte B → Martes & Viernes</div>
-        <div class="row"><span class="swatch" style="background:${partColors.C}"></span> Parte C → Miércoles & Sábado</div>
+        <h4>🧭 Atención propuesta (3 zonas por longitud)</h4>
+        <div class="row"><span class="swatch" style="background:${partColors.A}"></span> Parte A → Lunes &amp; Jueves (LJ)</div>
+        <div class="row"><span class="swatch" style="background:${partColors.B}"></span> Parte B → Martes &amp; Viernes (MV)</div>
+        <div class="row"><span class="swatch" style="background:${partColors.C}"></span> Parte C → Miércoles &amp; Sábado (XS)</div>
         <div class="row"><span class="pill">Filtro:</span> <span>${selectedDay}</span></div>
       `;
     }
-  };
+  }
 
-  const fitToLayer = (layer) => {
+  function fitToLayer(layer){
     const bounds = layer.getBounds();
-    if (bounds && bounds.isValid()) {
-      map.fitBounds(bounds.pad(0.1));
-    } else {
-      map.setView([-12.0464, -77.0428], 10); // Centro Lima
-    }
-  };
+    if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.1));
+    else map.setView([-12.0464, -77.0428], 10);
+  }
 
   function buildPopUp(r){
-    const partDays = partToDays[r.part]?.join(" & ") || "—";
-    const daysStr = (r.days.length? r.days.join(", ") : "—");
     const gm = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
+    const proposedDaysStr = (r.proposedDays && r.proposedDays.length) ? r.proposedDays.join(", ") : "—";
+    const partDays = r.part ? (partToDays[r.part]?.join(" & ")) : "—";
     return `
-      <div style="min-width:220px">
-        <div style="font-weight:700; font-size:14px; margin-bottom:4px;">Cliente: ${r.code}</div>
+      <div style="min-width:240px">
+        <div style="font-weight:700; font-size:14px; margin-bottom:6px;">Cliente: ${r.code}</div>
         <div><strong>Distrito:</strong> ${r.distrito}</div>
         <div><strong>Oficina:</strong> ${r.office}</div>
-        <div><strong>Días actuales:</strong> ${daysStr}</div>
-        <div><strong>Parte propuesta:</strong> ${r.part ?? "—"} <span style="color:#9CA3AF">(${partDays})</span></div>
-        <div style="margin-top:6px;"><a href="${gm}" target="_blank">Abrir en Google Maps ↗</a></div>
+        <hr style="border:none;border-top:1px solid #1f2937; margin:6px 0;">
+        <div><strong>Frecuencia actual:</strong> <span class="freq">${r.freqLetters || "—"}</span> <span style="color:#9CA3AF">(${r.days.join(", ") || "—"})</span></div>
+        <div><strong>Propuesta:</strong> <span class="freq">${r.proposedLetters || "—"}</span> <span style="color:#9CA3AF">(${proposedDaysStr})</span></div>
+        <div><strong>Parte:</strong> ${r.part ?? "—"} <span style="color:#9CA3AF">(${partDays})</span></div>
+        <div style="margin-top:6px;"><a href="${gm}" target="_blank" rel="noopener">Abrir en Google Maps ↗</a></div>
       </div>
     `;
   }
 
+  // ====== Render de capas ======
   function refreshLayers(){
-    // limpiar capas
     map.removeLayer(currentLayer);
     map.removeLayer(proposedLayer);
     currentLayer = L.markerClusterGroup(clusterOptions);
@@ -272,46 +281,28 @@
 
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
-
-    // Filtro de oficina
     const validOffice = (oNorm) => ( (oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri) );
 
     for (const r of records){
       if (!validOffice(normalize(r.office))) continue;
 
       if (viewMode === "Actual"){
-        // Filtro por día
-        let passes = false;
-        if (selectedDay === "Todos"){
-          passes = r.days.length > 0; // muestra los que tienen algún día asignado
-        } else {
-          passes = r.days.includes(selectedDay);
-        }
+        // Filtro por día en la frecuencia actual
+        let passes = (selectedDay === "Todos") ? r.days.length > 0 : r.days.includes(selectedDay);
         if (!passes) continue;
 
-        const color = selectedDay === "Todos"
-          ? dayColors[r.days[0]] || "#6b7280"
-          : dayColors[selectedDay] || "#6b7280";
+        // Color: si “Todos”, usa el 1er día; si no, el color del seleccionado
+        const baseColor = (selectedDay === "Todos") ? (dayColors[r.days[0]] || "#6b7280") : (dayColors[selectedDay] || "#6b7280");
 
         const marker = L.circleMarker([r.lat, r.lon], {
           radius:6, stroke:true, weight:1, color:"#0b1221",
-          fillColor: color, fillOpacity:0.9
+          fillColor: baseColor, fillOpacity:0.9
         }).bindPopup(buildPopUp(r));
         currentLayer.addLayer(marker);
 
       } else {
-        // Propuesta: mapa día -> parte
-        let passes = false;
-        if (selectedDay === "Todos"){
-          passes = true;
-        } else {
-          const part = r.part;
-          if (!part) passes = false;
-          else {
-            const days = partToDays[part] || [];
-            passes = days.includes(selectedDay);
-          }
-        }
+        // Filtro por día en la frecuencia propuesta
+        let passes = (selectedDay === "Todos") ? true : (r.proposedDays?.includes(selectedDay));
         if (!passes) continue;
 
         const color = partColors[r.part] || "#6b7280";
@@ -325,16 +316,15 @@
 
     if (viewMode === "Actual"){
       currentLayer.addTo(map);
-      if (!map.hasLayer(osm)) osm.addTo(map);
       fitToLayer(currentLayer);
     } else {
       proposedLayer.addTo(map);
-      if (!map.hasLayer(osm)) osm.addTo(map);
       fitToLayer(proposedLayer);
     }
     renderLegend();
   }
 
+  // ====== Ingesta del CSV ======
   function ingestRows(rows){
     records = [];
     const startIdx = hasHeader(rows[0]) ? 1 : 0;
@@ -352,23 +342,26 @@
 
       const distrito = (row[17] ?? "").toString().trim();
       const distNorm = normalize(distrito);
-      if (EXCLUDE_DISTRICTS.has(distNorm)) continue;
+      if (!INCLUDE_DISTRICTS.has(distNorm)) continue; // <<— Solo distritos de la lista
 
       const code = (row[0] ?? "").toString().trim();
       const daysRaw = (row[48] ?? "").toString().trim();
       const days = parseDays(daysRaw);
+      const freqLetters = toFreqLetters(days);
 
-      records.push({ code, distrito, office, daysRaw, days, lat, lon });
+      records.push({ code, distrito, office, daysRaw, days, freqLetters, lat, lon });
     }
 
-    // Partición por longitudes: tertiles para balancear A (oeste), B (centro), C (este)
+    // Partición por longitudes: terciles → A (oeste), B (centro), C (este)
     const longitudes = records.map(r=>r.lon);
     const {t1, t2} = computeTertiles(longitudes);
     for (const r of records){
       r.part = assignPart(r.lon, t1, t2);
+      r.proposedDays = partToDays[r.part] || [];
+      r.proposedLetters = partToFreqLetters[r.part] || "";
     }
 
-    // Centrar mapa (promedio)
+    // Centrar mapa
     if (records.length){
       const meanLat = records.reduce((a,r)=>a+r.lat,0)/records.length;
       const meanLon = records.reduce((a,r)=>a+r.lon,0)/records.length;
@@ -380,12 +373,10 @@
     refreshLayers();
   }
 
-  // Eventos UI
+  // ====== Eventos UI ======
   const viewToggle = document.getElementById('viewToggle');
-  const viewLabel = document.getElementById('viewLabel');
   viewToggle.addEventListener('change', ()=>{
     viewMode = viewToggle.checked ? "Propuesta" : "Actual";
-    viewLabel.textContent = viewMode === "Propuesta" ? "Actual" : "Actual"; // mantenemos "Actual" a la izquierda
     refreshLayers();
   });
 
@@ -412,7 +403,7 @@
     else fitToLayer(proposedLayer);
   });
 
-  // Carga CSV
+  // ====== Carga CSV ======
   Papa.parse(RAW_URL, {
     download:true,
     dynamicTyping:false,
@@ -435,4 +426,3 @@
 </script>
 </body>
 </html>
-``
