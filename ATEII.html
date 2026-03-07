@@ -119,14 +119,6 @@
     </div>
 
     <div class="group">
-      <label class="switch" title="Avenidas como referencia (beta)">
-        <span>Avenidas (beta)</span>
-        <input id="avenidasToggle" class="toggle-input" type="checkbox" />
-        <span class="toggle"><span class="knob"></span></span>
-      </label>
-    </div>
-
-    <div class="group">
       <button id="fitBtn" class="btn" title="Ajustar a puntos y zonas visibles">Ajustar vista</button>
     </div>
   </div>
@@ -144,11 +136,15 @@
   // ====== Catálogos y configuración ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-  // Excluir distritos (normalizados) + exclusión directa por código (caso Mi Perú)
+  // Excluir distritos + exclusión directa por código (caso Mi Perú)
   const EXCLUDE_DISTRICTS = new Set([
     "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA","VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
   ].map(s => normalize(s)));
   const EXCLUDE_CODES = new Set(["11747415"]);
+
+  // Filtros adicionales
+  const EXCLUDE_CANAL = "MOD";          // col[21]
+  const EXCLUDE_INTERLOC = "211087";    // col[26]
 
   // Mapeo días
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
@@ -166,39 +162,30 @@
   const partColors = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
   const partFill =   { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
 
-  // Avenidas (beta)
-  const AVENIDAS_KEYWORDS = [ /* agrega ejes por nombre si deseas */ ];
-  const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
-
   // ====== Estado UI ======
   let viewMode = "Actual";            // "Actual" | "Propuesta"
   let selectedDay = "Todos";          // "Todos" o nombre de día
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   let showMarkers = true;
-  let showAvenidas = false;
 
-  // ====== Mapa y PANES (orden de dibujo) ======
+  // ====== Mapa y PANES (polígonos debajo de marcadores) ======
   const map = L.map('map', { preferCanvas:true });
-
-  // Panes: zonas (debajo), avenidas (medio), marcadores (encima)
-  map.createPane('zonesPane');      map.getPane('zonesPane').style.zIndex = 300;
-  map.createPane('avenidasPane');   map.getPane('avenidasPane').style.zIndex = 400;
-  map.createPane('markersPane');    map.getPane('markersPane').style.zIndex = 600;
+  map.createPane('zonesPane');   map.getPane('zonesPane').style.zIndex = 300;  // zonas debajo
+  map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600; // marcadores encima
 
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution:'&copy; OpenStreetMap'
   }).addTo(map);
 
   // Capas
-  const currentLayer  = L.layerGroup().addTo(map);   // markers actuales
-  const proposedLayer = L.layerGroup();              // markers propuestos
+  const currentLayer  = L.layerGroup().addTo(map);                               // markers actuales
+  const proposedLayer = L.layerGroup();                                          // markers propuestos
   const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
-  const partPolysLayer = L.layerGroup().addTo(map);  // polígonos de partes
-  const avenidasLayer  = L.layerGroup();             // líneas de avenidas
+  const partPolysLayer = L.layerGroup().addTo(map);                              // polígonos de partes (debajo)
 
   // ====== Datos ======
-  let areaFeatures = null; // GeoJSON FeatureCollection
-  let records = []; // {code,name,distrito,office,daysRaw,days[],freqLetters,lat,lon,part,proposedDays[],proposedLetters}
+  let areaFeatures = null; // FeatureCollection
+  let records = [];        // {code,name,distrito,office,daysRaw,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters}
 
   // ====== Utilitarios ======
   function normalize(s){ return (s ?? "").toString().normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().trim(); }
@@ -227,30 +214,33 @@
     const order = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
     return order.map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
   }
-  function pointInsideArea(lat, lon){
-    if (!areaFeatures) return false;
-    const pt = turf.point([lon, lat]);
-    for (const f of areaFeatures.features){
-      if (turf.booleanPointInPolygon(pt, f)) return true;
-    }
-    return false;
-  }
-  function largestPolygon(feature){
-    if (!feature) return null;
-    let geom = feature.geometry;
-    if (!geom) return feature;
-    if (geom.type === 'Polygon') return feature;
 
-    if (geom.type === 'MultiPolygon'){
-      let maxA = -1, best = null;
-      for (const coords of geom.coordinates){
-        const poly = turf.polygon(coords, feature.properties || {});
-        const a = turf.area(poly);
-        if (a > maxA){ maxA = a; best = poly; }
-      }
-      return best;
+  // ——— Nombres de distrito desde el GeoJSON (clave robusta) ———
+  const DIST_KEYS = ["NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist","nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"];
+  function getFeatureDistName(f){
+    const p = f?.properties || {};
+    for (const k of DIST_KEYS){
+      if (p[k] && typeof p[k] === "string" && p[k].trim().length) return p[k].trim();
     }
-    return feature;
+    // si no hay clave conocida, intenta la primera propiedad string
+    for (const key in p){
+      if (typeof p[key] === "string" && p[key].trim().length) return p[key].trim();
+    }
+    return "Distrito";
+  }
+
+  // Devuelve índice y nombre del polígono que contiene el punto (o null si ninguno)
+  function getContainingFeature(lat, lon){
+    if (!areaFeatures) return null;
+    const pt = turf.point([lon, lat]);
+    const feats = areaFeatures.features || [];
+    for (let i=0; i<feats.length; i++){
+      const f = feats[i];
+      if (turf.booleanPointInPolygon(pt, f)) {
+        return { idx:i, name:getFeatureDistName(f) };
+      }
+    }
+    return null;
   }
 
   // ====== Leyenda ======
@@ -273,7 +263,6 @@
         <div class="row"><span class="swatch" style="background:${partColors.C}"></span> Parte C → Miércoles &amp; Sábado (XS) <span class="pill">${counts.C} clientes</span></div>
         <div class="row"><span class="pill">Filtro día:</span> <span>${selectedDay}</span></div>
         <div class="row"><span class="pill">Marcadores:</span> <span>${showMarkers ? "ON" : "OFF"}</span></div>
-        <div class="row"><span class="pill">Avenidas:</span> <span>${showAvenidas ? "ON" : "OFF"}</span></div>
       `;
     }
   }
@@ -285,7 +274,6 @@
     if (map.hasLayer(proposedLayer)) layers.push(proposedLayer);
     if (map.hasLayer(boundaryLayer)) layers.push(boundaryLayer);
     if (map.hasLayer(partPolysLayer)) layers.push(partPolysLayer);
-    if (map.hasLayer(avenidasLayer))  layers.push(avenidasLayer);
     for (const l of layers){
       const b = l.getBounds?.();
       if (b && b.isValid()){
@@ -300,11 +288,12 @@
     const gm = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
     const proposedDaysStr = (r.proposedDays && r.proposedDays.length) ? r.proposedDays.join(", ") : "—";
     const partDays = r.part ? (partToDays[r.part]?.join(" & ")) : "—";
+    const distShown = r.geoDistName || r.distrito || "—";
     return `
       <div style="min-width:240px">
         <div style="font-weight:700; font-size:14px; margin-bottom:6px;">Cliente: ${r.code}</div>
         <div><strong>Nombre:</strong> ${r.name || "—"}</div>
-        <div><strong>Distrito:</strong> ${r.distrito}</div>
+        <div><strong>Distrito (GeoJSON):</strong> ${distShown}</div>
         <div><strong>Oficina:</strong> ${r.office}</div>
         <hr style="border:none;border-top:1px solid #1f2937; margin:6px 0;">
         <div><strong>Frecuencia actual:</strong> <span class="freq">${r.freqLetters || "—"}</span> <span style="color:#9CA3AF">(${r.days.join(", ") || "—"})</span></div>
@@ -364,9 +353,6 @@
     }
 
     drawPartPolygons();
-    if (showAvenidas) { if (!map.hasLayer(avenidasLayer)) avenidasLayer.addTo(map); }
-    else { if (map.hasLayer(avenidasLayer)) map.removeLayer(avenidasLayer); }
-
     renderLegend();
     fitToContent();
   }
@@ -385,7 +371,7 @@
     return counts;
   }
 
-  // ====== Polígonos por parte (convex hull) SIN solapes ======
+  // ====== Polígonos por parte (hulls recortados para no solapar) ======
   function drawPartPolygons(){
     partPolysLayer.clearLayers();
 
@@ -433,18 +419,28 @@
           color: partColors[p],
           weight: 1.2,
           fillColor: partFill[p],
-          fillOpacity: 0.15
-        }
-      }).addTo(partPolysLayer);
-    });
+          fillOpacity: 0.ull;
+    let geom = feature.geometry;
+    if (!geom) return feature;
+    if (geom.type === 'Polygon') return feature;
+    if (geom.type === 'MultiPolygon'){
+      let maxA = -1, best = null;
+      for (const coords of geom.coordinates){
+        const poly = turf.polygon(coords, feature.properties || {});
+        const a = turf.area(poly);
+        if (a > maxA){ maxA = a; best = poly; }
+      }
+      return best;
+    }
+    return feature;
   }
 
-  // ====== Balanceo por cantidad (3 partes) + Consolidación por distrito ======
-  function assignBalancedParts(){
+  // ====== Balanceo por cantidad + Consolidación por distrito (GeoJSON) + Limpieza “lunares” ======
+  function assignBalancedPartsAndSnapToDistricts(){
+    // 1) Balanceo por cantidad (oeste→este)
     const sorted = [...records].sort((a,b)=>a.lon - b.lon);
     const n = sorted.length;
     if (n === 0) return;
-
     const size = Math.ceil(n / 3);
     const cut1 = size;
     const cut2 = size * 2;
@@ -459,20 +455,26 @@
       r.proposedLetters = partToFreqLetters[part];
     }
 
-    const byDist = new Map(); // distNorm -> {counts: {A,B,C}, majority}
+    // 2) Mayoría por distrito GeoJSON (usamos featIdx)
+    const byFeat = new Map(); // featIdx -> {A,B,C}
     for (const r of records){
-      const d = normalize(r.distrito || "");
-      if (!byDist.has(d)) byDist.set(d, {counts:{A:0,B:0,C:0}});
-      byDist.get(d).counts[r.part] = (byDist.get(d).counts[r.part] || 0) + 1;
+      const key = r.featIdx;
+      if (key == null) continue;
+      if (!byFeat.has(key)) byFeat.set(key, {A:0,B:0,C:0});
+      byFeat.get(key)[r.part] = (byFeat.get(key)[r.part] || 0) + 1;
     }
-    for (const [d, obj] of byDist){
-      const entries = Object.entries(obj.counts);
-      const majority = entries.reduce((acc, cur)=> cur[1] > acc[1] ? cur : acc, ["A",0])[0];
-      obj.majority = majority;
+    const featMajority = new Map(); // featIdx -> 'A'|'B'|'C'
+    for (const [idx, counts] of byFeat){
+      let maj = "A", max = -1;
+      for (const p of ["A","B","C"]){
+        if ((counts[p] || 0) > max){ max = counts[p]; maj = p; }
+      }
+      featMajority.set(idx, maj);
     }
+
+    // 3) “Snap” final: todo punto adopta la parte de su distrito GeoJSON (elimina lunares)
     for (const r of records){
-      const d = normalize(r.distrito || "");
-      const mj = byDist.get(d)?.majority;
+      const mj = featMajority.get(r.featIdx);
       if (mj && r.part !== mj){
         r.part = mj;
         r.proposedDays = partToDays[mj];
@@ -494,33 +496,37 @@
       if (EXCLUDE_CODES.has(code)) continue;
 
       const name = (row[7] ?? "").toString().trim();
-      const canal = (row[21] ?? "").toString().trim();         // << Canal
-      const interloc = (row[26] ?? "").toString().trim();       // << Interlocutor
+      const canal = (row[21] ?? "").toString().trim();
+      const interloc = (row[26] ?? "").toString().trim();
       const lat = num(row[28]);
       const lon = num(row[29]);
-
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
       const office = (row[46] ?? "").toString().trim();
       const officeNorm = normalize(office);
       if (!OFFICES.has(officeNorm)) continue;
 
-      // Filtro espacial por polígono
-      if (!pointInsideArea(lat, lon)) continue;
+      // Filtro espacial y captura del distrito real (GeoJSON)
+      const container = getContainingFeature(lat, lon);
+      if (!container) continue;
+      const geoDistName = container.name;
+      const geoDistNorm = normalize(geoDistName);
+      if (EXCLUDE_DISTRICTS.has(geoDistNorm)) continue;
 
-      const distrito = (row[17] ?? "").toString().trim();
-      const distNorm = normalize(distrito);
-      if (EXCLUDE_DISTRICTS.has(distNorm)) continue;
+      // Filtros adicionales solicitados
+      if (normalize(canal) === normalize(EXCLUDE_CANAL)) continue;   // Canal MOD
+      if (interloc === EXCLUDE_INTERLOC) continue;                   // Interlocutor 211087
 
-      // **NUEVOS FILTROS**
-      if (normalize(canal) === "MOD") continue;        // excluir canal MOD (col[21])
-      if (interloc === "211087") continue;            // excluir interlocutor 211087 (col[26])
-
+      const csvDistrito = (row[17] ?? "").toString().trim();
       const daysRaw = (row[48] ?? "").toString().trim();
       const days = parseDays(daysRaw);
       const freqLetters = toFreqLetters(days);
 
-      prelim.push({ code, name, distrito, office, daysRaw, days, freqLetters, lat, lon });
+      prelim.push({
+        code, name, distrito: csvDistrito, office,
+        daysRaw, days, freqLetters, lat, lon,
+        featIdx: container.idx, geoDistName
+      });
     }
 
     // Deduplicación por (Nombre normalizado + Lat/Lon)
@@ -538,53 +544,11 @@
 
     records = deduped;
 
-    // Particionar (balance + consolidación por distrito)
-    assignBalancedParts();
+    // Particionar y “snap” final por distrito GeoJSON
+    assignBalancedPartsAndSnapToDistricts();
 
     // Pintar
     refreshLayers();
-  }
-
-  // ====== Avenidas (beta) ======
-  async function loadAvenidas(){
-    avenidasLayer.clearLayers();
-    if (!showAvenidas || AVENIDAS_KEYWORDS.length === 0) return;
-
-    const b = boundaryLayer.getBounds();
-    if (!b || !b.isValid()) return;
-    const south = b.getSouth(), west = b.getWest(), north = b.getNorth(), east = b.getEast();
-
-    // Consulta simple (placeholder). Cuando definamos nombres exactos, la afino.
-    const q = `
-      [out:json][timeout:25];
-      way[highway](${south},${west},${north},${east});
-      out geom;
-    `;
-
-    try{
-      const res = await fetch("https://overpass-api.de/api/interpreter", { method:"POST", body:q, headers:{ "Content-Type":"text/plain" }});
-      const data = await res.json();
-      const features = [];
-      if (data && data.elements){
-        for (const el of data.elements){
-          if (el.type === "way" && el.geometry){
-            const coords = el.geometry.map(g => [g.lon, g.lat]);
-            features.push({
-              type:"Feature",
-              properties: { name: el.tags?.name || "Vía", highway: el.tags?.highway || "" },
-              geometry:{ type:"LineString", coordinates: coords }
-            });
-          }
-        }
-      }
-      const gj = { type:"FeatureCollection", features };
-      L.geoJSON(gj, {
-        pane:'avenidasPane',
-        style: { color:'#fbbf24', weight:3, opacity:0.8 }
-      }).addTo(avenidasLayer);
-    }catch(e){
-      console.error("Overpass falló o no devolvió datos:", e);
-    }
   }
 
   // ====== Eventos UI ======
@@ -619,19 +583,13 @@
     refreshLayers();
   });
 
-  document.getElementById('avenidasToggle').addEventListener('change', async (e)=>{
-    showAvenidas = e.target.checked;
-    if (showAvenidas) await loadAvenidas();
-    refreshLayers();
-  });
-
   document.getElementById('fitBtn').addEventListener('click', fitToContent);
 
   // ====== Carga GeoJSON + CSV ======
   fetch(GEOJSON_URL)
     .then(r => r.json())
     .then(geo => {
-      areaFeatures = geo && geo.type === "FeatureCollection" ? geo : { type:"FeatureCollection", features: [geo] };
+      areaFeatures = (geo && geo.type === "FeatureCollection") ? geo : { type:"FeatureCollection", features: [geo] };
       boundaryLayer.addData(areaFeatures);
       try {
         const b = boundaryLayer.getBounds();
