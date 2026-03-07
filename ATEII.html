@@ -166,11 +166,8 @@
   const partColors = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
   const partFill =   { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
 
-  // Avenidas (beta): edita esta lista si quieres forzar ejes específicos
-  const AVENIDAS_KEYWORDS = [
-    // Ejemplos: "Panamericana", "Evitamiento", "Universitaria", "Javier Prado"
-    // Agrega aquí los ejes que quieras usar como referencia
-  ];
+  // Avenidas (beta)
+  const AVENIDAS_KEYWORDS = [ /* agrega ejes por nombre si deseas */ ];
   const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
 
   // ====== Estado UI ======
@@ -193,11 +190,11 @@
   }).addTo(map);
 
   // Capas
-  const currentLayer  = L.layerGroup().addTo(map);   // markers actuales (pane markers)
-  const proposedLayer = L.layerGroup();              // markers propuestos (pane markers)
+  const currentLayer  = L.layerGroup().addTo(map);   // markers actuales
+  const proposedLayer = L.layerGroup();              // markers propuestos
   const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
-  const partPolysLayer = L.layerGroup().addTo(map);  // polígonos de partes (pane zones)
-  const avenidasLayer  = L.layerGroup();             // líneas de avenidas (pane avenidas)
+  const partPolysLayer = L.layerGroup().addTo(map);  // polígonos de partes
+  const avenidasLayer  = L.layerGroup();             // líneas de avenidas
 
   // ====== Datos ======
   let areaFeatures = null; // GeoJSON FeatureCollection
@@ -239,7 +236,6 @@
     return false;
   }
   function largestPolygon(feature){
-    // Devuelve la geometría con el polígono (o multipolígono reducido) de mayor área
     if (!feature) return null;
     let geom = feature.geometry;
     if (!geom) return feature;
@@ -319,7 +315,7 @@
     `;
   }
 
-  // ====== Render de capas (markers abajo/arriba según pane) ======
+  // ====== Render de capas ======
   function refreshLayers(){
     currentLayer.clearLayers();
     proposedLayer.clearLayers();
@@ -342,7 +338,6 @@
             radius:5.5, stroke:true, weight:1, color:"#0b1221",
             fillColor: color, fillOpacity:0.95
           }).bindPopup(buildPopUp(r));
-
           currentLayer.addLayer(marker);
 
         } else {
@@ -355,13 +350,11 @@
             radius:5.5, stroke:true, weight:1, color:"#0b1221",
             fillColor: color, fillOpacity:0.95
           }).bindPopup(buildPopUp(r));
-
           proposedLayer.addLayer(marker);
         }
       }
     }
 
-    // alternar capa visible
     if (viewMode === "Actual"){
       if (!map.hasLayer(currentLayer)) currentLayer.addTo(map);
       if (map.hasLayer(proposedLayer)) map.removeLayer(proposedLayer);
@@ -370,10 +363,7 @@
       if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
     }
 
-    // Actualizar polígonos de partes (siempre por debajo)
     drawPartPolygons();
-
-    // Avenidas (beta)
     if (showAvenidas) { if (!map.hasLayer(avenidasLayer)) avenidasLayer.addTo(map); }
     else { if (map.hasLayer(avenidasLayer)) map.removeLayer(avenidasLayer); }
 
@@ -395,15 +385,13 @@
     return counts;
   }
 
-  // ====== Polígonos por parte (convex hull) SIN solapes ni “lunares” ======
+  // ====== Polígonos por parte (convex hull) SIN solapes ======
   function drawPartPolygons(){
     partPolysLayer.clearLayers();
 
-    // 1) Agrupar puntos por parte
     const groups = { A:[], B:[], C:[] };
     for (const r of records) if (r.part) groups[r.part].push(turf.point([r.lon, r.lat]));
 
-    // 2) Hull por grupo (o buffer si pocos puntos)
     const hulls = {};
     ["A","B","C"].forEach(p=>{
       const pts = groups[p];
@@ -418,14 +406,12 @@
       hulls[p] = hull;
     });
 
-    // 3) Orden oeste→este por la x del centroide
     const order = Object.keys(hulls).sort((p1,p2)=>{
       const c1 = turf.center(hulls[p1]).geometry.coordinates[0];
       const c2 = turf.center(hulls[p2]).geometry.coordinates[0];
       return c1 - c2;
     });
 
-    // 4) Quitar solapes en cascada (A, luego B\A, luego C\(A∪B))
     const result = {};
     let unionPrev = null;
     for (const p of order){
@@ -434,13 +420,11 @@
         const diff = turf.difference(poly, unionPrev);
         if (diff) poly = diff;
       }
-      // quita “lunares”: conserva solo el polígono de mayor área
       poly = largestPolygon(poly);
       result[p] = poly;
       unionPrev = unionPrev ? turf.union(unionPrev, poly) : poly;
     }
 
-    // 5) Pintar (si existe)
     ["A","B","C"].forEach(p=>{
       if (!result[p]) return;
       L.geoJSON(result[p], {
@@ -457,7 +441,6 @@
 
   // ====== Balanceo por cantidad (3 partes) + Consolidación por distrito ======
   function assignBalancedParts(){
-    // 1) Ordenar por longitud (oeste→este) y repartir en 3 por cantidad
     const sorted = [...records].sort((a,b)=>a.lon - b.lon);
     const n = sorted.length;
     if (n === 0) return;
@@ -476,8 +459,7 @@
       r.proposedLetters = partToFreqLetters[part];
     }
 
-    // 2) Consolidar por distrito hacia su parte mayoritaria (reduce “lunares”)
-    const byDist = new Map(); // distNorm -> {counts: {A,B,C}, majority: 'A'|'B'|'C'}
+    const byDist = new Map(); // distNorm -> {counts: {A,B,C}, majority}
     for (const r of records){
       const d = normalize(r.distrito || "");
       if (!byDist.has(d)) byDist.set(d, {counts:{A:0,B:0,C:0}});
@@ -503,7 +485,6 @@
   function ingestRows(rows){
     const startIdx = hasHeader(rows[0]) ? 1 : 0;
 
-    // 1) Filtrado base
     const prelim = [];
     for (let i=startIdx; i<rows.length; i++){
       const row = rows[i];
@@ -512,22 +493,29 @@
       const code = (row[0] ?? "").toString().trim();
       if (EXCLUDE_CODES.has(code)) continue;
 
+      const name = (row[7] ?? "").toString().trim();
+      const canal = (row[21] ?? "").toString().trim();         // << Canal
+      const interloc = (row[26] ?? "").toString().trim();       // << Interlocutor
       const lat = num(row[28]);
       const lon = num(row[29]);
+
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
       const office = (row[46] ?? "").toString().trim();
       const officeNorm = normalize(office);
       if (!OFFICES.has(officeNorm)) continue;
 
-      // Dentro del polígono
+      // Filtro espacial por polígono
       if (!pointInsideArea(lat, lon)) continue;
 
       const distrito = (row[17] ?? "").toString().trim();
       const distNorm = normalize(distrito);
       if (EXCLUDE_DISTRICTS.has(distNorm)) continue;
 
-      const name = (row[7] ?? "").toString().trim();
+      // **NUEVOS FILTROS**
+      if (normalize(canal) === "MOD") continue;        // excluir canal MOD (col[21])
+      if (interloc === "211087") continue;            // excluir interlocutor 211087 (col[26])
+
       const daysRaw = (row[48] ?? "").toString().trim();
       const days = parseDays(daysRaw);
       const freqLetters = toFreqLetters(days);
@@ -535,7 +523,7 @@
       prelim.push({ code, name, distrito, office, daysRaw, days, freqLetters, lat, lon });
     }
 
-    // 2) Deduplicación por (nombre normalizado + lat/lon)
+    // Deduplicación por (Nombre normalizado + Lat/Lon)
     const seen = new Set();
     const deduped = [];
     for (const r of prelim){
@@ -550,38 +538,31 @@
 
     records = deduped;
 
-    // 3) Particionar (balance + consolidación por distrito)
+    // Particionar (balance + consolidación por distrito)
     assignBalancedParts();
 
-    // 4) Pintar
+    // Pintar
     refreshLayers();
   }
 
-  // ====== Avenidas (beta) – visualización y base para delimitación por ejes ======
+  // ====== Avenidas (beta) ======
   async function loadAvenidas(){
     avenidasLayer.clearLayers();
     if (!showAvenidas || AVENIDAS_KEYWORDS.length === 0) return;
 
-    // Tomamos el bounding box del polígono de distritos para acotar la consulta
     const b = boundaryLayer.getBounds();
     if (!b || !b.isValid()) return;
     const south = b.getSouth(), west = b.getWest(), north = b.getNorth(), east = b.getEast();
 
-    // Overpass QL: buscar highways con nombres que contengan los keywords
-    const nameRegex = AVENIDAS_KEYWORDS.map(k => `~"${k}"`).join("|"); // no usado directamente para evitar errores
-    // Construimos varias consultas OR
-    const nameFilters = AVENIDAS_KEYWORDS.map(k => `way["highway"]["name"~"${k}", i](${south},${west},${north},${east});`).join("\n");
-
+    // Consulta simple (placeholder). Cuando definamos nombres exactos, la afino.
     const q = `
       [out:json][timeout:25];
-      (
-        ${nameFilters}
-      );
+      way[highway](${south},${west},${north},${east});
       out geom;
     `;
 
     try{
-      const res = await fetch(OVERPASS_ENDPOINT, { method:"POST", body:q, headers:{ "Content-Type":"text/plain" }});
+      const res = await fetch("https://overpass-api.de/api/interpreter", { method:"POST", body:q, headers:{ "Content-Type":"text/plain" }});
       const data = await res.json();
       const features = [];
       if (data && data.elements){
@@ -590,7 +571,7 @@
             const coords = el.geometry.map(g => [g.lon, g.lat]);
             features.push({
               type:"Feature",
-              properties: { name: el.tags?.name || "Avenida", highway: el.tags?.highway || "" },
+              properties: { name: el.tags?.name || "Vía", highway: el.tags?.highway || "" },
               geometry:{ type:"LineString", coordinates: coords }
             });
           }
@@ -599,7 +580,7 @@
       const gj = { type:"FeatureCollection", features };
       L.geoJSON(gj, {
         pane:'avenidasPane',
-        style: { color:'#fbbf24', weight:3, opacity:0.8 } // amarillo
+        style: { color:'#fbbf24', weight:3, opacity:0.8 }
       }).addTo(avenidasLayer);
     }catch(e){
       console.error("Overpass falló o no devolvió datos:", e);
@@ -652,12 +633,10 @@
     .then(geo => {
       areaFeatures = geo && geo.type === "FeatureCollection" ? geo : { type:"FeatureCollection", features: [geo] };
       boundaryLayer.addData(areaFeatures);
-      // Centrar al polígono
       try {
         const b = boundaryLayer.getBounds();
         if (b && b.isValid()) map.fitBounds(b.pad(0.05));
       } catch(e){}
-      // Cargar CSV
       Papa.parse(CSV_URL, {
         download:true,
         dynamicTyping:false,
@@ -679,7 +658,6 @@
     .catch(err => {
       console.error("No se pudo cargar el GeoJSON:", err);
       alert("No se pudo cargar el GeoJSON de límites.");
-      // Intentar cargar CSV igual (sin filtro espacial)
       Papa.parse(CSV_URL, {
         download:true,
         dynamicTyping:false,
