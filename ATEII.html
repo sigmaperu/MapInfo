@@ -136,7 +136,7 @@
   // ====== Catálogos y configuración ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-  // Excluir distritos + exclusión directa por código (caso Mi Perú)
+  // Excluir distritos + exclusión por código (caso Mi Perú)
   const EXCLUDE_DISTRICTS = new Set([
     "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA","VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
   ].map(s => normalize(s)));
@@ -160,7 +160,7 @@
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
   const partColors = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
-  const partFill =   { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
+  const partFill   = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
 
   // ====== Estado UI ======
   let viewMode = "Actual";            // "Actual" | "Propuesta"
@@ -170,7 +170,7 @@
 
   // ====== Mapa y PANES (polígonos debajo de marcadores) ======
   const map = L.map('map', { preferCanvas:true });
-  map.createPane('zonesPane');   map.getPane('zonesPane').style.zIndex = 300;  // zonas debajo
+  map.createPane('zonesPane');   map.getPane('zonesPane').style.zIndex = 300;   // zonas debajo
   map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600; // marcadores encima
 
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -188,7 +188,9 @@
   let records = [];        // {code,name,distrito,office,daysRaw,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters}
 
   // ====== Utilitarios ======
-  function normalize(s){ return (s ?? "").toString().normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().trim(); }
+  function normalize(s){
+    return (s ?? "").toString().normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().trim();
+  }
   function normalizeName(s){ return normalize(s).replace(/\s+/g,' '); }
   function num(s){
     if (s == null) return NaN;
@@ -222,14 +224,14 @@
     for (const k of DIST_KEYS){
       if (p[k] && typeof p[k] === "string" && p[k].trim().length) return p[k].trim();
     }
-    // si no hay clave conocida, intenta la primera propiedad string
+    // fallback: primera propiedad string
     for (const key in p){
       if (typeof p[key] === "string" && p[key].trim().length) return p[key].trim();
     }
     return "Distrito";
   }
 
-  // Devuelve índice y nombre del polígono que contiene el punto (o null si ninguno)
+  // Devuelve índice y nombre del polígono que contiene el punto (o null)
   function getContainingFeature(lat, lon){
     if (!areaFeatures) return null;
     const pt = turf.point([lon, lat]);
@@ -318,7 +320,7 @@
         if (!validOffice(normalize(r.office))) continue;
 
         if (viewMode === "Actual"){
-          let passes = (selectedDay === "Todos") ? r.days.length > 0 : r.days.includes(selectedDay);
+          const passes = (selectedDay === "Todos") ? r.days.length > 0 : r.days.includes(selectedDay);
           if (!passes) continue;
           const color = (selectedDay === "Todos") ? (dayColors[r.days[0]] || "#6b7280") : (dayColors[selectedDay] || "#6b7280");
 
@@ -330,7 +332,7 @@
           currentLayer.addLayer(marker);
 
         } else {
-          let passes = (selectedDay === "Todos") ? true : (r.proposedDays?.includes(selectedDay));
+          const passes = (selectedDay === "Todos") ? true : (r.proposedDays?.includes(selectedDay));
           if (!passes) continue;
           const color = partColors[r.part] || "#6b7280";
 
@@ -419,8 +421,15 @@
           color: partColors[p],
           weight: 1.2,
           fillColor: partFill[p],
-          fillOpacity: 0.ull;
-    let geom = feature.geometry;
+          fillOpacity: 0.15
+        }
+      }).addTo(partPolysLayer);
+    });
+  }
+
+  function largestPolygon(feature){
+    if (!feature) return null;
+    const geom = feature.geometry;
     if (!geom) return feature;
     if (geom.type === 'Polygon') return feature;
     if (geom.type === 'MultiPolygon'){
@@ -435,7 +444,7 @@
     return feature;
   }
 
-  // ====== Balanceo por cantidad + Consolidación por distrito (GeoJSON) + Limpieza “lunares” ======
+  // ====== Balanceo por cantidad + “Snap” por distrito GeoJSON ======
   function assignBalancedPartsAndSnapToDistricts(){
     // 1) Balanceo por cantidad (oeste→este)
     const sorted = [...records].sort((a,b)=>a.lon - b.lon);
@@ -455,7 +464,7 @@
       r.proposedLetters = partToFreqLetters[part];
     }
 
-    // 2) Mayoría por distrito GeoJSON (usamos featIdx)
+    // 2) Mayoría por distrito GeoJSON (featIdx)
     const byFeat = new Map(); // featIdx -> {A,B,C}
     for (const r of records){
       const key = r.featIdx;
@@ -472,7 +481,7 @@
       featMajority.set(idx, maj);
     }
 
-    // 3) “Snap” final: todo punto adopta la parte de su distrito GeoJSON (elimina lunares)
+    // 3) Snap final: todo punto adopta la parte de su distrito (elimina lunares)
     for (const r of records){
       const mj = featMajority.get(r.featIdx);
       if (mj && r.part !== mj){
@@ -496,8 +505,8 @@
       if (EXCLUDE_CODES.has(code)) continue;
 
       const name = (row[7] ?? "").toString().trim();
-      const canal = (row[21] ?? "").toString().trim();
-      const interloc = (row[26] ?? "").toString().trim();
+      const canal = (row[21] ?? "").toString().trim();   // col[21]
+      const interloc = (row[26] ?? "").toString().trim(); // col[26]
       const lat = num(row[28]);
       const lon = num(row[29]);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
@@ -506,16 +515,16 @@
       const officeNorm = normalize(office);
       if (!OFFICES.has(officeNorm)) continue;
 
-      // Filtro espacial y captura del distrito real (GeoJSON)
+      // Filtro espacial + capturar distrito desde GeoJSON
       const container = getContainingFeature(lat, lon);
       if (!container) continue;
       const geoDistName = container.name;
       const geoDistNorm = normalize(geoDistName);
       if (EXCLUDE_DISTRICTS.has(geoDistNorm)) continue;
 
-      // Filtros adicionales solicitados
-      if (normalize(canal) === normalize(EXCLUDE_CANAL)) continue;   // Canal MOD
-      if (interloc === EXCLUDE_INTERLOC) continue;                   // Interlocutor 211087
+      // Filtros adicionales
+      if (normalize(canal) === normalize(EXCLUDE_CANAL)) continue; // Canal MOD
+      if (interloc === EXCLUDE_INTERLOC) continue;                 // Interlocutor 211087
 
       const csvDistrito = (row[17] ?? "").toString().trim();
       const daysRaw = (row[48] ?? "").toString().trim();
@@ -544,7 +553,7 @@
 
     records = deduped;
 
-    // Particionar y “snap” final por distrito GeoJSON
+    // Particionar y “snap” por distrito GeoJSON
     assignBalancedPartsAndSnapToDistricts();
 
     // Pintar
