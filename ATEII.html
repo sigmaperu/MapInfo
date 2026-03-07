@@ -136,11 +136,11 @@
   // ====== Catálogos y configuración ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-  // Excluir distritos + exclusión por código (caso Mi Perú)
+  // Excluir distritos + exclusión por códigos (Mi Perú + nuevos)
   const EXCLUDE_DISTRICTS = new Set([
     "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA","VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
   ].map(s => normalize(s)));
-  const EXCLUDE_CODES = new Set(["11747415"]);
+  const EXCLUDE_CODES = new Set(["11747415","11604173","11747406"]); // << añadidos
 
   // Filtros adicionales
   const EXCLUDE_CANAL = "MOD";          // col[21]
@@ -180,12 +180,15 @@
   // Capas
   const currentLayer  = L.layerGroup().addTo(map);                               // markers actuales
   const proposedLayer = L.layerGroup();                                          // markers propuestos
+  // Borde rojo general (opcional)
   const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
-  const partPolysLayer = L.layerGroup().addTo(map);                              // polígonos de partes (debajo)
+  // Capa de distritos coloreados por parte
+  const districtsLayerHolder = L.layerGroup().addTo(map);
 
   // ====== Datos ======
   let areaFeatures = null; // FeatureCollection
   let records = [];        // {code,name,distrito,office,daysRaw,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters}
+  let featurePartByIdx = new Map(); // idx -> 'A'|'B'|'C'
 
   // ====== Utilitarios ======
   function normalize(s){
@@ -224,7 +227,6 @@
     for (const k of DIST_KEYS){
       if (p[k] && typeof p[k] === "string" && p[k].trim().length) return p[k].trim();
     }
-    // fallback: primera propiedad string
     for (const key in p){
       if (typeof p[key] === "string" && p[key].trim().length) return p[key].trim();
     }
@@ -239,7 +241,8 @@
     for (let i=0; i<feats.length; i++){
       const f = feats[i];
       if (turf.booleanPointInPolygon(pt, f)) {
-        return { idx:i, name:getFeatureDistName(f) };
+        const name = getFeatureDistName(f);
+        return { idx:i, name };
       }
     }
     return null;
@@ -275,7 +278,7 @@
     if (map.hasLayer(currentLayer))  layers.push(currentLayer);
     if (map.hasLayer(proposedLayer)) layers.push(proposedLayer);
     if (map.hasLayer(boundaryLayer)) layers.push(boundaryLayer);
-    if (map.hasLayer(partPolysLayer)) layers.push(partPolysLayer);
+    if (map.hasLayer(districtsLayerHolder)) layers.push(districtsLayerHolder);
     for (const l of layers){
       const b = l.getBounds?.();
       if (b && b.isValid()){
@@ -354,7 +357,9 @@
       if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
     }
 
-    drawPartPolygons();
+    // Pintar distritos coloreados por parte
+    renderDistrictsColoredByPart();
+
     renderLegend();
     fitToContent();
   }
@@ -373,78 +378,42 @@
     return counts;
   }
 
-  // ====== Polígonos por parte (hulls recortados para no solapar) ======
-  function drawPartPolygons(){
-    partPolysLayer.clearLayers();
+  // ====== Pintar distritos con color de su parte y popup con nombre ======
+  function renderDistrictsColoredByPart(){
+    districtsLayerHolder.clearLayers();
+    if (!areaFeatures) return;
 
-    const groups = { A:[], B:[], C:[] };
-    for (const r of records) if (r.part) groups[r.part].push(turf.point([r.lon, r.lat]));
+    // GeoJSON puede perder el índice; agregamos __idx estable
+    areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
 
-    const hulls = {};
-    ["A","B","C"].forEach(p=>{
-      const pts = groups[p];
-      if (!pts || pts.length === 0) return;
-      const fc = turf.featureCollection(pts);
-      let hull = null;
-      if (pts.length >= 3) hull = turf.convex(fc);
-      if (!hull){
-        const centroid = turf.center(fc);
-        hull = turf.buffer(centroid, 1, {units:"kilometers"});
-      }
-      hulls[p] = hull;
-    });
-
-    const order = Object.keys(hulls).sort((p1,p2)=>{
-      const c1 = turf.center(hulls[p1]).geometry.coordinates[0];
-      const c2 = turf.center(hulls[p2]).geometry.coordinates[0];
-      return c1 - c2;
-    });
-
-    const result = {};
-    let unionPrev = null;
-    for (const p of order){
-      let poly = hulls[p];
-      if (unionPrev){
-        const diff = turf.difference(poly, unionPrev);
-        if (diff) poly = diff;
-      }
-      poly = largestPolygon(poly);
-      result[p] = poly;
-      unionPrev = unionPrev ? turf.union(unionPrev, poly) : poly;
-    }
-
-    ["A","B","C"].forEach(p=>{
-      if (!result[p]) return;
-      L.geoJSON(result[p], {
-        pane:'zonesPane',
-        style: {
-          color: partColors[p],
-          weight: 1.2,
-          fillColor: partFill[p],
-          fillOpacity: 0.15
+    const districtsLayer = L.geoJSON(areaFeatures, {
+      pane:'zonesPane',
+      style: (feature) => {
+        const idx = feature.properties.__idx;
+        const part = featurePartByIdx.get(idx);
+        if (part){
+          return {
+            color: partColors[part],
+            weight: 1.2,
+            fillColor: partFill[part],
+            fillOpacity: 0.18
+          };
         }
-      }).addTo(partPolysLayer);
-    });
-  }
-
-  function largestPolygon(feature){
-    if (!feature) return null;
-    const geom = feature.geometry;
-    if (!geom) return feature;
-    if (geom.type === 'Polygon') return feature;
-    if (geom.type === 'MultiPolygon'){
-      let maxA = -1, best = null;
-      for (const coords of geom.coordinates){
-        const poly = turf.polygon(coords, feature.properties || {});
-        const a = turf.area(poly);
-        if (a > maxA){ maxA = a; best = poly; }
+        // Sin parte asignada: borde tenue, sin relleno
+        return { color:'#ef4444', weight:1, fillOpacity:0 };
+      },
+      onEachFeature: (feature, layer) => {
+        const name = getFeatureDistName(feature);
+        layer.on('click', (e) => {
+          L.popup().setLatLng(e.latlng).setContent(`<strong>${name}</strong>`).openOn(map);
+        });
       }
-      return best;
-    }
-    return feature;
+    });
+
+    districtsLayer.addTo(districtsLayerHolder);
   }
 
-  // ====== Balanceo por cantidad + “Snap” por distrito GeoJSON ======
+  // ====== Balanceo + “Snap” por distrito GeoJSON ======
   function assignBalancedPartsAndSnapToDistricts(){
     // 1) Balanceo por cantidad (oeste→este)
     const sorted = [...records].sort((a,b)=>a.lon - b.lon);
@@ -472,18 +441,18 @@
       if (!byFeat.has(key)) byFeat.set(key, {A:0,B:0,C:0});
       byFeat.get(key)[r.part] = (byFeat.get(key)[r.part] || 0) + 1;
     }
-    const featMajority = new Map(); // featIdx -> 'A'|'B'|'C'
+    featurePartByIdx = new Map();
     for (const [idx, counts] of byFeat){
       let maj = "A", max = -1;
       for (const p of ["A","B","C"]){
         if ((counts[p] || 0) > max){ max = counts[p]; maj = p; }
       }
-      featMajority.set(idx, maj);
+      featurePartByIdx.set(idx, maj);
     }
 
-    // 3) Snap final: todo punto adopta la parte de su distrito (elimina lunares)
+    // 3) Snap final: cada punto adopta la parte del distrito contenedor
     for (const r of records){
-      const mj = featMajority.get(r.featIdx);
+      const mj = featurePartByIdx.get(r.featIdx);
       if (mj && r.part !== mj){
         r.part = mj;
         r.proposedDays = partToDays[mj];
@@ -599,7 +568,9 @@
     .then(r => r.json())
     .then(geo => {
       areaFeatures = (geo && geo.type === "FeatureCollection") ? geo : { type:"FeatureCollection", features: [geo] };
-      boundaryLayer.addData(areaFeatures);
+      // index estable
+      areaFeatures.features.forEach((f,i)=>{ if(!f.properties) f.properties={}; f.properties.__idx=i; });
+      boundaryLayer.addData(areaFeatures); // borde general
       try {
         const b = boundaryLayer.getBounds();
         if (b && b.isValid()) map.fitBounds(b.pad(0.05));
