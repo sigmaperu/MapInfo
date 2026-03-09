@@ -6,7 +6,7 @@
 <title>ATEII – Atención actual vs propuesta</title>
 
 <!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- PapaParse (CSV) -->
@@ -40,18 +40,14 @@
     display:flex; gap:10px; align-items:center; flex-wrap:wrap;
   }
   .group{ display:flex; gap:6px; align-items:center; padding:6px 8px; background:var(--card); border:1px solid var(--line); border-radius:10px; }
-  .segmented{
-    display:flex; overflow:hidden; border-radius:8px; border:1px solid var(--line);
-  }
+  .segmented{ display:flex; overflow:hidden; border-radius:8px; border:1px solid var(--line); }
   .segmented button{
     background:#0b1221; color:var(--text); border:0; padding:6px 10px; cursor:pointer; font-weight:600;
   }
   .segmented button.active{ background:var(--brand); color:#0b1221; }
   .segmented button + button{ border-left:1px solid var(--line); }
   label.switch{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
-  .toggle{
-    width:44px; height:24px; background:#111827; border:1px solid var(--line); border-radius:999px; position:relative; transition:.2s;
-  }
+  .toggle{ width:44px; height:24px; background:#111827; border:1px solid var(--line); border-radius:999px; position:relative; transition:.2s; }
   .knob{ width:20px; height:20px; background:white; border-radius:50%; position:absolute; top:1px; left:1px; transition:.2s; }
   input[type="checkbox"].toggle-input{ display:none; }
   input[type="checkbox"].toggle-input:checked + .toggle{ background:#16a34a; }
@@ -79,9 +75,7 @@
 <header>
   <div style="display:flex; flex-direction:column;">
     <h1>ATEII · Mapa de atención</h1>
-    <div class="muted">
-      CSV: raw GitHub (Catálogo Sigma) · GeoJSON: distritos (RoadMap)
-    </div>
+    <div class="muted">CSV: raw GitHub (Catálogo Sigma) · GeoJSON: distritos (RoadMap)</div>
   </div>
 
   <div class="controls">
@@ -131,7 +125,6 @@
 </header>
 
 <div id="map" role="application" aria-label="Mapa Leaflet de atención a clientes"></div>
-
 <div class="legend" id="legend"></div>
 
 <script>
@@ -139,76 +132,63 @@
   const CSV_URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
   const GEOJSON_URL = "https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson";
 
-  // ====== Catálogos y configuración ======
+  // ====== Config ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-  // Excluir distritos + exclusión por códigos (Mi Perú + nuevos)
   const EXCLUDE_DISTRICTS = new Set([
     "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA","VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
   ].map(s => normalize(s)));
-  const EXCLUDE_CODES = new Set(["11747415","11604173","11747406","11684549"]); // << añadí 11684549
 
-  // Filtros adicionales
+  const EXCLUDE_CODES = new Set(["11747415","11604173","11747406","11684549"]); // << actualizados
   const EXCLUDE_INTERLOC = "211087";                    // col[26]
   const PROPUESTA_BAJA_VAL = "PROPUESTA BAJA";          // col[55], comparación normalizada
 
-  // Palabras clave a excluir dentro de CANAL=MOD por nombre (col[7])
+  // MOD permitido salvo estos nombres
   const MOD_EXCLUDE_KEYWORDS = [
     "Plaza vea","SPSA Makro","Economax","Supermercados Peruanos","Mayorsa",
-    "Metro","Cencosud","Tottus","CD Huachipa","Comidas gourmet","Delivery Hero","Ajiles","Solana" // << agregado
+    "Metro","Cencosud","Tottus","CD Huachipa","Comidas gourmet","Delivery Hero","Ajiles","Solana"
   ].map(s => normalize(s));
 
-  // Mapeo días
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
   const dayNameToLetter = { "Lunes":"L", "Martes":"M", "Miércoles":"X", "Jueves":"J", "Viernes":"V", "Sábado":"S" };
 
-  // Propuesta por partes (distritos coloreados por parte)
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
   const partColors = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
   const partFill   = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
 
-  // ====== Estado UI ======
-  let viewMode = "Actual";            // "Actual" | "Propuesta"
-  let selectedDay = "Todos";          // "Todos" o nombre de día
-  let selectedCanal = "Todos";        // Filtro por canal
+  // ====== UI State ======
+  let viewMode = "Actual";
+  let selectedDay = "Todos";
+  let selectedCanal = "Todos";
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   let showMarkers = true;
 
-  // ====== Mapa y PANES (polígonos debajo de marcadores) ======
+  // ====== Map & panes ======
   const map = L.map('map', { preferCanvas:true });
-  map.createPane('zonesPane');   map.getPane('zonesPane').style.zIndex = 300;   // zonas debajo
-  map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600; // marcadores encima
+  map.createPane('zonesPane');   map.getPane('zonesPane').style.zIndex = 300;
+  map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600;
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution:'&copy; OpenStreetMap'
-  }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
 
-  // Capas
-  const currentLayer  = L.layerGroup().addTo(map);                               // markers actuales
-  const proposedLayer = L.layerGroup();                                          // markers propuestos
+  const currentLayer  = L.layerGroup().addTo(map);
+  const proposedLayer = L.layerGroup();
   const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
-  const districtsLayerHolder = L.layerGroup().addTo(map);                        // distritos por parte
+  const districtsLayerHolder = L.layerGroup().addTo(map);
 
-  // ====== Datos ======
-  let areaFeatures = null; // FeatureCollection
-  let records = [];        // {code,name,canal,canalNorm,distrito,office,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters}
-  let featurePartByIdx = new Map(); // idx -> 'A'|'B'|'C'
-  let channelPalette = {}; // canal -> color
+  // ====== Data ======
+  let areaFeatures = null;
+  let records = [];  // {code,name,canal,canalNorm,distrito,office,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters}
+  let featurePartByIdx = new Map();
+  let channelPalette = {};
 
-  // ====== Utilitarios ======
+  // ====== Utils ======
   function normalize(s){
-    // Si el navegador no soporta \p{Diacritic}, hacemos un fallback simple
     try { return (s ?? "").toString().normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().trim(); }
     catch(e){ return (s ?? "").toString().toUpperCase().trim(); }
   }
   function normalizeName(s){ return normalize(s).replace(/\s+/g,' '); }
-  function num(s){
-    if (s == null) return NaN;
-    const t = s.toString().replace(",", ".");
-    const v = parseFloat(t);
-    return Number.isFinite(v) ? v : NaN;
-  }
+  function num(s){ if (s == null) return NaN; const t = s.toString().replace(",", "."); const v = parseFloat(t); return Number.isFinite(v) ? v : NaN; }
   function hasHeader(row){
     const a = num(row[28]), b = num(row[29]);
     const t28 = (row[28] ?? "").toString().toLowerCase();
@@ -217,63 +197,31 @@
     if (t28.includes("lat") || t29.includes("lon")) return true;
     return false;
   }
-  function parseDays(raw){
-    const s = (raw ?? "").toString().toUpperCase().replace(/[^LMXJVS]/g,"");
-    const set = new Set();
-    for (const ch of s) if (dayLetterToName[ch]) set.add(dayLetterToName[ch]);
-    return Array.from(set);
-  }
-  function toFreqLetters(dayArr){
-    const order = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
-    return order.map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
-  }
+  function parseDays(raw){ const s=(raw??"").toString().toUpperCase().replace(/[^LMXJVS]/g,""); const set=new Set(); for(const ch of s) if(dayLetterToName[ch]) set.add(dayLetterToName[ch]); return Array.from(set); }
+  function toFreqLetters(dayArr){ const order=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"]; return order.map(n=> dayArr.includes(n)? dayNameToLetter[n] : "").join(""); }
 
-  // ——— Nombres de distrito desde el GeoJSON (clave robusta) ———
   const DIST_KEYS = ["NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist","nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"];
-  function getFeatureDistName(f){
-    const p = f?.properties || {};
-    for (const k of DIST_KEYS){
-      if (p[k] && typeof p[k] === "string" && p[k].trim().length) return p[k].trim();
-    }
-    for (const key in p){
-      if (typeof p[key] === "string" && p[key].trim().length) return p[key].trim();
-    }
-    return "Distrito";
-  }
-
-  // Devuelve índice y nombre del polígono que contiene el punto (o null)
+  function getFeatureDistName(f){ const p=f?.properties||{}; for(const k of DIST_KEYS){ if(p[k] && typeof p[k]==="string" && p[k].trim().length) return p[k].trim(); } for(const k in p){ if(typeof p[k]==="string" && p[k].trim().length) return p[k].trim(); } return "Distrito"; }
   function getContainingFeature(lat, lon){
     if (!areaFeatures) return null;
     const pt = turf.point([lon, lat]);
     const feats = areaFeatures.features || [];
-    for (let i=0; i<feats.length; i++){
-      const f = feats[i];
-      if (turf.booleanPointInPolygon(pt, f)) {
-        const name = getFeatureDistName(f);
-        return { idx:i, name };
-      }
-    }
+    for (let i=0; i<feats.length; i++){ const f=feats[i]; if (turf.booleanPointInPolygon(pt, f)) { return { idx:i, name:getFeatureDistName(f) }; } }
     return null;
   }
 
-  // ====== Paleta de colores por CANAL ======
-  const baseColors = [
-    "#22c55e","#eab308","#06b6d4","#f97316","#a855f7","#ef4444","#14b8a6",
-    "#f43f5e","#84cc16","#e879f9","#60a5fa","#f59e0b","#10b981","#8b5cf6"
-  ];
+  const baseColors = ["#22c55e","#eab308","#06b6d4","#f97316","#a855f7","#ef4444","#14b8a6","#f43f5e","#84cc16","#e879f9","#60a5fa","#f59e0b","#10b981","#8b5cf6"];
   function colorForChannel(canal){
     if (!canal) return "#6b7280";
-    const key = canal;
-    if (channelPalette[key]) return channelPalette[key];
-    // hash simple para asignar color estable
-    let h = 0;
-    for (let i=0; i<key.length; i++) h = (h*31 + key.charCodeAt(i)) >>> 0;
+    if (channelPalette[canal]) return channelPalette[canal];
+    let h=0; for(let i=0;i<canal.length;i++) h=(h*31 + canal.charCodeAt(i))>>>0;
     const color = baseColors[h % baseColors.length];
-    channelPalette[key] = color;
-    return color;
+    channelPalette[canal] = color; return color;
   }
 
-  // ====== Leyenda ======
+  function escapeHtml(s){ return (s ?? "").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+  // ====== Legend ======
   const legendEl = document.getElementById('legend');
   function renderLegend(){
     const channelCounts = countByChannelWithFilters();
@@ -282,14 +230,10 @@
       return `<div class="row"><span class="swatch" style="background:${color}"></span> ${canal} <span class="pill">${channelCounts[canal]} clientes</span></div>`;
     }).join("");
 
-    // Resúmenes
     const partCounts = countByPartWithFilters();
     const dayCounts  = countByDayWithFilters();
 
-    const header = (viewMode === "Actual")
-      ? `🎯 Atención actual`
-      : `🧭 Propuesta (distritos por parte)`;
-
+    const header = (viewMode === "Actual") ? `🎯 Atención actual` : `🧭 Propuesta (distritos por parte)`;
     legendEl.innerHTML = `
       <h4>${header}</h4>
       <div class="row"><span class="pill">Día:</span> <span>${selectedDay}</span> &nbsp; <span class="pill">Canal:</span> <span>${selectedCanal}</span></div>
@@ -342,11 +286,7 @@
     `;
   }
 
-  function escapeHtml(s){
-    return (s ?? "").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-  }
-
-  // ====== Render de capas ======
+  // ====== Rendering ======
   function refreshLayers(){
     currentLayer.clearLayers();
     proposedLayer.clearLayers();
@@ -358,16 +298,17 @@
     if (showMarkers){
       for (const r of records){
         if (!validOffice(normalize(r.office))) continue;
-        // Filtro por canal
         if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
 
+        // >>> FIX CLAVE: con Día = "Todos" NO filtramos por día en ninguna vista
         if (viewMode === "Actual"){
-          const passes = (selectedDay === "Todos") ? r.days.length > 0 : r.days.includes(selectedDay);
+          const passes = (selectedDay === "Todos") ? true : r.days.includes(selectedDay);
           if (!passes) continue;
         } else {
           const passes = (selectedDay === "Todos") ? true : (r.proposedDays?.includes(selectedDay));
           if (!passes) continue;
         }
+        // <<<
 
         const color = colorForChannel(r.canal || "");
         const marker = L.circleMarker([r.lat, r.lon], {
@@ -388,14 +329,12 @@
       if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
     }
 
-    // Pintar distritos coloreados por parte
     renderDistrictsColoredByPart();
-
     renderLegend();
-    fitToContent(); // auto-ajuste
+    fitToContent();
   }
 
-  // ====== Conteo por CANAL (para leyenda) con filtros activos ======
+  // ====== Resúmenes ======
   function countByChannelWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -404,18 +343,21 @@
     for (const r of records){
       if (!validOffice(normalize(r.office))) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+
+      // >>> Mismo criterio que en markers: con "Todos" no excluye por día
       if (viewMode === "Actual"){
-        if (!(selectedDay === "Todos" ? r.days.length>0 : r.days.includes(selectedDay))) continue;
+        if (!(selectedDay === "Todos" ? true : r.days.includes(selectedDay))) continue;
       } else {
         if (!(selectedDay === "Todos" ? true : (r.proposedDays?.includes(selectedDay)))) continue;
       }
+      // <<<
+
       const key = r.canal || "Sin canal";
       counts[key] = (counts[key] || 0) + 1;
     }
     return counts;
   }
 
-  // ====== Conteo por parte con filtros activos ======
   function countByPartWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -424,17 +366,18 @@
     for (const r of records){
       if (!validOffice(normalize(r.office))) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+
       if (viewMode === "Actual"){
-        if (!(selectedDay === "Todos" ? r.days.length>0 : r.days.includes(selectedDay))) continue;
+        if (!(selectedDay === "Todos" ? true : r.days.includes(selectedDay))) continue;
       } else {
         if (!(selectedDay === "Todos" ? true : (r.proposedDays?.includes(selectedDay)))) continue;
       }
+
       if (r.part && counts[r.part] !== undefined) counts[r.part]++;
     }
     return counts;
   }
 
-  // ====== Conteo por día con filtros activos ======
   function countByDayWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -445,13 +388,7 @@
       if (!validOffice(normalize(r.office))) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
 
-      let dayArr = [];
-      if (viewMode === "Actual"){
-        dayArr = r.days;
-      } else {
-        dayArr = r.proposedDays || [];
-      }
-
+      const dayArr = (viewMode === "Actual") ? r.days : (r.proposedDays || []);
       for (const d of dayArr){
         const letter = dayNameToLetter[d];
         if (letter && counts[letter] !== undefined) counts[letter]++;
@@ -460,12 +397,10 @@
     return counts;
   }
 
-  // ====== Distritos coloreados por parte y popup con nombre ======
+  // ====== Distritos pintados por parte ======
   function renderDistrictsColoredByPart(){
     districtsLayerHolder.clearLayers();
     if (!areaFeatures) return;
-
-    // GeoJSON con índice estable
     areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
 
     const districtsLayer = L.geoJSON(areaFeatures, {
@@ -474,12 +409,7 @@
         const idx = feature.properties.__idx;
         const part = featurePartByIdx.get(idx);
         if (part){
-          return {
-            color: partColors[part],
-            weight: 1.2,
-            fillColor: partFill[part],
-            fillOpacity: 0.18
-          };
+          return { color: partColors[part], weight: 1.2, fillColor: partFill[part], fillOpacity: 0.18 };
         }
         return { color:'#ef4444', weight:1, fillOpacity:0 };
       },
@@ -494,97 +424,76 @@
     districtsLayer.addTo(districtsLayerHolder);
   }
 
-  // ====== Balanceo + “Snap” por distrito GeoJSON ======
+  // ====== Partición y “snap” ======
   function assignBalancedPartsAndSnapToDistricts(){
-    // 1) Balanceo por cantidad (oeste→este)
     const sorted = [...records].sort((a,b)=>a.lon - b.lon);
     const n = sorted.length;
     if (n === 0) return;
     const size = Math.ceil(n / 3);
-    const cut1 = size;
-    const cut2 = size * 2;
-
+    const cut1 = size, cut2 = size * 2;
     for (let i=0; i<n; i++){
       const r = sorted[i];
-      let part = "C";
-      if (i < cut1) part = "A";
-      else if (i < cut2) part = "B";
-      r.part = part;
-      r.proposedDays = partToDays[part];
-      r.proposedLetters = partToFreqLetters[part];
+      r.part = (i < cut1) ? "A" : (i < cut2 ? "B" : "C");
+      r.proposedDays = partToDays[r.part];
+      r.proposedLetters = partToFreqLetters[r.part];
     }
 
-    // 2) Mayoría por distrito GeoJSON (featIdx)
-    const byFeat = new Map(); // featIdx -> {A,B,C}
+    const byFeat = new Map();
     for (const r of records){
-      const key = r.featIdx;
-      if (key == null) continue;
-      if (!byFeat.has(key)) byFeat.set(key, {A:0,B:0,C:0});
-      byFeat.get(key)[r.part] = (byFeat.get(key)[r.part] || 0) + 1;
+      const k = r.featIdx; if (k == null) continue;
+      if (!byFeat.has(k)) byFeat.set(k, {A:0,B:0,C:0});
+      byFeat.get(k)[r.part] = (byFeat.get(k)[r.part] || 0) + 1;
     }
     featurePartByIdx = new Map();
     for (const [idx, counts] of byFeat){
-      let maj = "A", max = -1;
-      for (const p of ["A","B","C"]){
-        if ((counts[p] || 0) > max){ max = counts[p]; maj = p; }
-      }
+      let maj="A", max=-1; for (const p of ["A","B","C"]) { if ((counts[p]||0) > max){ max=counts[p]; maj=p; } }
       featurePartByIdx.set(idx, maj);
     }
-
-    // 3) Snap final: cada punto adopta la parte del distrito contenedor
     for (const r of records){
       const mj = featurePartByIdx.get(r.featIdx);
-      if (mj && r.part !== mj){
-        r.part = mj;
-        r.proposedDays = partToDays[mj];
-        r.proposedLetters = partToFreqLetters[mj];
-      }
+      if (mj && r.part !== mj){ r.part = mj; r.proposedDays = partToDays[mj]; r.proposedLetters = partToFreqLetters[mj]; }
     }
   }
 
-  // ====== Ingesta del CSV + GeoJSON ======
+  // ====== Ingesta ======
   function ingestRows(rows){
     const startIdx = hasHeader(rows[0]) ? 1 : 0;
-
     const prelim = [];
     for (let i=startIdx; i<rows.length; i++){
-      const row = rows[i];
-      if (!row) continue;
+      const row = rows[i]; if (!row) continue;
 
       const code = (row[0] ?? "").toString().trim();
       if (EXCLUDE_CODES.has(code)) continue;
 
       const name = (row[7] ?? "").toString().trim();
-      const canal = (row[21] ?? "").toString().trim();   // col[21]
-      const interloc = (row[26] ?? "").toString().trim();// col[26]
-      const lat = num(row[28]);
-      const lon = num(row[29]);
+      const canal = (row[21] ?? "").toString().trim();
+      const interloc = (row[26] ?? "").toString().trim();
+      const lat = num(row[28]), lon = num(row[29]);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
       const office = (row[46] ?? "").toString().trim();
       const officeNorm = normalize(office);
       if (!OFFICES.has(officeNorm)) continue;
 
-      // Filtro espacial + capturar distrito desde GeoJSON
       const container = getContainingFeature(lat, lon);
       if (!container) continue;
       const geoDistName = container.name;
       const geoDistNorm = normalize(geoDistName);
       if (EXCLUDE_DISTRICTS.has(geoDistNorm)) continue;
 
-      // Filtro por Propuesta baja (col[55])
+      // col[55]: Propuesta baja -> excluir
       const propuestaFlag = (row[55] ?? "").toString().trim();
       if (normalize(propuestaFlag) === PROPUESTA_BAJA_VAL) continue;
 
-      // Filtro por interlocutor
+      // interlocutor excluido
       if (interloc === EXCLUDE_INTERLOC) continue;
 
-      // Reglas de CANAL (permitir MOD salvo keywords en nombre)
+      // MOD permitido salvo keywords en nombre
       const canalNorm = normalize(canal);
       const nameNorm = normalizeName(name);
       if (canalNorm === "MOD"){
         const hit = MOD_EXCLUDE_KEYWORDS.some(k => nameNorm.includes(k));
-        if (hit) continue; // excluir MOD con estos nombres
+        if (hit) continue;
       }
 
       const csvDistrito = (row[17] ?? "").toString().trim();
@@ -599,121 +508,63 @@
       });
     }
 
-    // Deduplicación por (Nombre normalizado + Lat/Lon)
-    const seen = new Set();
-    const deduped = [];
+    // Deduplicación Nombre+Lat/Lon
+    const seen = new Set(); const deduped = [];
     for (const r of prelim){
-      const nameKey = normalizeName(r.name || "");
-      const latKey = Number.isFinite(r.lat) ? r.lat.toFixed(6) : "";
-      const lonKey = Number.isFinite(r.lon) ? r.lon.toFixed(6) : "";
-      const key = `${nameKey}|${latKey}|${lonKey}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      deduped.push(r);
+      const key = `${normalizeName(r.name||"")}|${Number.isFinite(r.lat)?r.lat.toFixed(6):""}|${Number.isFinite(r.lon)?r.lon.toFixed(6):""}`;
+      if (seen.has(key)) continue; seen.add(key); deduped.push(r);
     }
-
     records = deduped;
 
     // Filtro de canales (Todos + encontrados)
     populateCanalFilter(records.map(r=>r.canal).filter(Boolean));
 
-    // Particionar y “snap” por distrito GeoJSON
+    // Particionar y snap
     assignBalancedPartsAndSnapToDistricts();
 
-    // Pintar
+    // Render
     refreshLayers();
   }
 
   function populateCanalFilter(canalList){
     const sel = document.getElementById('canalFilter');
     const uniq = Array.from(new Set(canalList));
-    sel.innerHTML = `<option value="Todos">Todos</option>` +
-      uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+    sel.innerHTML = `<option value="Todos">Todos</option>` + uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
   }
 
-  // ====== Eventos UI ======
-  document.getElementById('viewToggle').addEventListener('change', (e)=>{
-    viewMode = e.target.checked ? "Propuesta" : "Actual";
-    refreshLayers();
-  });
-
+  // ====== Events ======
+  document.getElementById('viewToggle').addEventListener('change', (e)=>{ viewMode = e.target.checked ? "Propuesta" : "Actual"; refreshLayers(); });
   document.getElementById('dayFilter').addEventListener('click', (e)=>{
     if (e.target.tagName === "BUTTON"){
       document.querySelectorAll('#dayFilter button').forEach(b=>b.classList.remove('active'));
-      e.target.classList.add('active');
-      selectedDay = e.target.dataset.day;
-      refreshLayers();
+      e.target.classList.add('active'); selectedDay = e.target.dataset.day; refreshLayers();
     }
   });
+  document.getElementById('canalFilter').addEventListener('change', (e)=>{ selectedCanal = e.target.value || "Todos"; refreshLayers(); });
+  document.getElementById('oficAte').addEventListener('change', (e)=>{ if (e.target.checked) filterOffices.add("OFIC ATE"); else filterOffices.delete("OFIC ATE"); renderLegend(); refreshLayers(); });
+  document.getElementById('oficChorri').addEventListener('change', (e)=>{ if (e.target.checked) filterOffices.add("OFIC CHORRILLOS"); else filterOffices.delete("OFIC CHORRILLOS"); renderLegend(); refreshLayers(); });
+  document.getElementById('markersToggle').addEventListener('change', (e)=>{ showMarkers = e.target.checked; renderLegend(); refreshLayers(); });
 
-  document.getElementById('canalFilter').addEventListener('change', (e)=>{
-    selectedCanal = e.target.value || "Todos";
-    refreshLayers();
-  });
-
-  document.getElementById('oficAte').addEventListener('change', (e)=>{
-    if (e.target.checked) filterOffices.add("OFIC ATE"); else filterOffices.delete("OFIC ATE");
-    renderLegend();
-    refreshLayers();
-  });
-  document.getElementById('oficChorri').addEventListener('change', (e)=>{
-    if (e.target.checked) filterOffices.add("OFIC CHORRILLOS"); else filterOffices.delete("OFIC CHORRILLOS");
-    renderLegend();
-    refreshLayers();
-  });
-
-  document.getElementById('markersToggle').addEventListener('change', (e)=>{
-    showMarkers = e.target.checked;
-    renderLegend();
-    refreshLayers();
-  });
-
-  // ====== Carga GeoJSON + CSV ======
+  // ====== Load GeoJSON + CSV ======
   fetch(GEOJSON_URL)
     .then(r => r.json())
     .then(geo => {
       areaFeatures = (geo && geo.type === "FeatureCollection") ? geo : { type:"FeatureCollection", features: [geo] };
-      // index estable
       areaFeatures.features.forEach((f,i)=>{ if(!f.properties) f.properties={}; f.properties.__idx=i; });
-      boundaryLayer.addData(areaFeatures); // borde general
-      try {
-        const b = boundaryLayer.getBounds();
-        if (b && b.isValid()) map.fitBounds(b.pad(0.05));
-      } catch(e){}
+      boundaryLayer.addData(areaFeatures);
+      try { const b=boundaryLayer.getBounds(); if (b && b.isValid()) map.fitBounds(b.pad(0.05)); } catch(e){}
       Papa.parse(CSV_URL, {
-        download:true,
-        dynamicTyping:false,
-        skipEmptyLines:true,
-        complete: (results) => {
-          const rows = results.data;
-          if (!rows || !rows.length){
-            alert("No se pudo leer el CSV o está vacío.");
-            return;
-          }
-          ingestRows(rows);
-        },
-        error: (err) => {
-          console.error(err);
-          alert("Error al descargar o parsear el CSV.");
-        }
+        download:true, dynamicTyping:false, skipEmptyLines:true,
+        complete: (results) => { const rows=results.data; if (!rows || !rows.length){ alert("No se pudo leer el CSV o está vacío."); return; } ingestRows(rows); },
+        error: (err) => { console.error(err); alert("Error al descargar o parsear el CSV."); }
       });
     })
     .catch(err => {
       console.error("No se pudo cargar el GeoJSON:", err);
       alert("No se pudo cargar el GeoJSON de límites.");
       Papa.parse(CSV_URL, {
-        download:true,
-        dynamicTyping:false,
-        skipEmptyLines:true,
-        complete: (results) => {
-          const rows = results.data;
-          if (!rows || !rows.length){
-            alert("No se pudo leer el CSV o está vacío.");
-            return;
-          }
-          alert("Advertencia: no se aplicó el filtro por polígono (GeoJSON no disponible).");
-          ingestRows(rows);
-        }
+        download:true, dynamicTyping:false, skipEmptyLines:true,
+        complete: (results) => { const rows=results.data; if (!rows || !rows.length){ alert("No se pudo leer el CSV o está vacío."); return; } alert("Advertencia: no se aplicó el filtro por polígono (GeoJSON no disponible)."); ingestRows(rows); }
       });
     });
 
