@@ -6,7 +6,7 @@
 <title>ATEII – Atención actual vs propuesta</title>
 
 <!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- PapaParse (CSV) -->
@@ -55,7 +55,7 @@
   #map{ height: calc(100vh - 98px); }
   .legend{
     position:absolute; bottom:12px; left:12px; z-index:600; background:var(--card);
-    border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px; max-width: 360px;
+    border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px; max-width: 380px;
   }
   .legend h4{ margin:0 0 6px 0; font-size:13px; }
   .legend .row{ display:flex; align-items:center; gap:8px; margin:4px 0; flex-wrap:wrap;}
@@ -121,6 +121,10 @@
         <span class="toggle"><span class="knob"></span></span>
       </label>
     </div>
+
+    <div class="group">
+      <button id="exportBtn" class="btn" title="Exportar CSV (respeta filtros activos)">Exportar CSV</button>
+    </div>
   </div>
 </header>
 
@@ -139,7 +143,7 @@
     "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA","VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
   ].map(s => normalize(s)));
 
-  const EXCLUDE_CODES = new Set(["11747415","11604173","11747406","11684549"]); // << actualizados
+  const EXCLUDE_CODES = new Set(["11747415","11604173","11747406","11684549"]);
   const EXCLUDE_INTERLOC = "211087";                    // col[26]
   const PROPUESTA_BAJA_VAL = "PROPUESTA BAJA";          // col[55], comparación normalizada
 
@@ -178,7 +182,7 @@
 
   // ====== Data ======
   let areaFeatures = null;
-  let records = [];  // {code,name,canal,canalNorm,distrito,office,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters}
+  let records = [];  // {code,name,canal,canalNorm,distrito,office,route,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters}
   let featurePartByIdx = new Map();
   let channelPalette = {};
 
@@ -218,7 +222,6 @@
     const color = baseColors[h % baseColors.length];
     channelPalette[canal] = color; return color;
   }
-
   function escapeHtml(s){ return (s ?? "").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
   // ====== Legend ======
@@ -281,6 +284,7 @@
         <div class="popup-line"><strong>Frecuencia actual:</strong> <span class="freq">${freqNow}</span></div>
         <div class="popup-line"><strong>Propuesta:</strong> <span class="freq">${freqProp}</span> <span class="popup-muted">(${escapeHtml(proposedDaysStr)})</span></div>
         <div class="popup-line"><strong>Parte (distrito):</strong> ${r.part ?? "—"} <span class="popup-muted">(${escapeHtml(partDays)})</span></div>
+        <div class="popup-line"><strong>Ruta:</strong> ${escapeHtml(r.route || "")}</div>
         <div class="popup-line" style="margin-top:6px;"><a href="${gm}" target="_blank" rel="noopener">Abrir en Google Maps ↗</a></div>
       </div>
     `;
@@ -300,7 +304,7 @@
         if (!validOffice(normalize(r.office))) continue;
         if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
 
-        // >>> FIX CLAVE: con Día = "Todos" NO filtramos por día en ninguna vista
+        // Con Día = "Todos" NO filtramos por día en ninguna vista (consistencia de totales)
         if (viewMode === "Actual"){
           const passes = (selectedDay === "Todos") ? true : r.days.includes(selectedDay);
           if (!passes) continue;
@@ -308,7 +312,6 @@
           const passes = (selectedDay === "Todos") ? true : (r.proposedDays?.includes(selectedDay));
           if (!passes) continue;
         }
-        // <<<
 
         const color = colorForChannel(r.canal || "");
         const marker = L.circleMarker([r.lat, r.lon], {
@@ -343,15 +346,11 @@
     for (const r of records){
       if (!validOffice(normalize(r.office))) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
-
-      // >>> Mismo criterio que en markers: con "Todos" no excluye por día
       if (viewMode === "Actual"){
         if (!(selectedDay === "Todos" ? true : r.days.includes(selectedDay))) continue;
       } else {
         if (!(selectedDay === "Todos" ? true : (r.proposedDays?.includes(selectedDay)))) continue;
       }
-      // <<<
-
       const key = r.canal || "Sin canal";
       counts[key] = (counts[key] || 0) + 1;
     }
@@ -366,13 +365,11 @@
     for (const r of records){
       if (!validOffice(normalize(r.office))) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
-
       if (viewMode === "Actual"){
         if (!(selectedDay === "Todos" ? true : r.days.includes(selectedDay))) continue;
       } else {
         if (!(selectedDay === "Todos" ? true : (r.proposedDays?.includes(selectedDay)))) continue;
       }
-
       if (r.part && counts[r.part] !== undefined) counts[r.part]++;
     }
     return counts;
@@ -397,13 +394,13 @@
     return counts;
   }
 
-  // ====== Distritos pintados por parte ======
+  // ====== Distritos pintados por parte (con tooltip y popup-resumen) ======
   function renderDistrictsColoredByPart(){
     districtsLayerHolder.clearLayers();
     if (!areaFeatures) return;
     areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
 
-    const districtsLayer = L.geoJSON(areaFeatures, {
+    const layer = L.geoJSON(areaFeatures, {
       pane:'zonesPane',
       style: (feature) => {
         const idx = feature.properties.__idx;
@@ -413,15 +410,48 @@
         }
         return { color:'#ef4444', weight:1, fillOpacity:0 };
       },
-      onEachFeature: (feature, layer) => {
+      onEachFeature: (feature, polygonLayer) => {
         const name = getFeatureDistName(feature);
-        layer.on('click', (e) => {
-          L.popup().setLatLng(e.latlng).setContent(`<strong>${escapeHtml(name)}</strong>`).openOn(map);
+        // tooltip con el nombre
+        polygonLayer.bindTooltip(name, {direction:'center', opacity:0.85, sticky:true});
+        // popup con resumen al hacer click
+        polygonLayer.on('click', (e) => {
+          const idx = feature.properties.__idx;
+          const resume = summarizeDistrict(idx);
+          const html = `
+            <div style="min-width:220px">
+              <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(name)}</div>
+              <div>Total clientes (visibles): <strong>${resume.total}</strong></div>
+              <div>Por parte → A: <strong>${resume.A}</strong> · B: <strong>${resume.B}</strong> · C: <strong>${resume.C}</strong></div>
+            </div>
+          `;
+          L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
         });
       }
     });
 
-    districtsLayer.addTo(districtsLayerHolder);
+    layer.addTo(districtsLayerHolder);
+  }
+
+  function summarizeDistrict(featIdx){
+    const useAte = filterOffices.has("OFIC ATE");
+    const useChorri = filterOffices.has("OFIC CHORRILLOS");
+    const validOffice = (oNorm) => ( (oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri) );
+
+    const res = { total:0, A:0, B:0, C:0 };
+    for (const r of records){
+      if (r.featIdx !== featIdx) continue;
+      if (!validOffice(normalize(r.office))) continue;
+      if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+      if (viewMode === "Actual"){
+        if (!(selectedDay === "Todos" ? true : r.days.includes(selectedDay))) continue;
+      } else {
+        if (!(selectedDay === "Todos" ? true : (r.proposedDays?.includes(selectedDay)))) continue;
+      }
+      res.total++;
+      if (r.part && res[r.part] !== undefined) res[r.part]++;
+    }
+    return res;
   }
 
   // ====== Partición y “snap” ======
@@ -465,6 +495,7 @@
       const code = (row[0] ?? "").toString().trim();
       if (EXCLUDE_CODES.has(code)) continue;
 
+      const route = (row[12] ?? "").toString().trim();   // << Ruta
       const name = (row[7] ?? "").toString().trim();
       const canal = (row[21] ?? "").toString().trim();
       const interloc = (row[26] ?? "").toString().trim();
@@ -502,7 +533,7 @@
       const freqLetters = toFreqLetters(days);
 
       prelim.push({
-        code, name, canal, canalNorm, distrito: csvDistrito, office,
+        code, name, canal, canalNorm, distrito: csvDistrito, office, route,
         daysRaw, days, freqLetters, lat, lon,
         featIdx: container.idx, geoDistName
       });
@@ -530,6 +561,51 @@
     const sel = document.getElementById('canalFilter');
     const uniq = Array.from(new Set(canalList));
     sel.innerHTML = `<option value="Todos">Todos</option>` + uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  }
+
+  // ====== Export CSV (respeta filtros y vista) ======
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const rows = getFilteredRowsForExport();
+    const headers = [
+      "Codigo Cliente","Nombre Cliente","Distrito Catálogo","Distrito GeoJson",
+      "Frecuencia Actual","Frecuencia Propuesta","Canal","Ruta"
+    ];
+    const csv = [headers].concat(rows.map(r => [
+      r.code, r.name, r.distrito, r.geoDistName,
+      r.freqLetters || "", r.proposedLetters || "", r.canal || "", r.route || ""
+    ].map(v => csvEscape(v)).join(","))).join("\r\n");
+
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "ATEII_export.csv"; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  function getFilteredRowsForExport(){
+    const useAte = filterOffices.has("OFIC ATE");
+    const useChorri = filterOffices.has("OFIC CHORRILLOS");
+    const validOffice = (oNorm) => ( (oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri) );
+
+    const out = [];
+    for (const r of records){
+      if (!validOffice(normalize(r.office))) continue;
+      if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+
+      // misma lógica que visualización
+      const passes = (selectedDay === "Todos") ? true :
+                     (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay)));
+      if (!passes) continue;
+
+      out.push(r);
+    }
+    return out;
+  }
+
+  function csvEscape(v){
+    const s = (v ?? "").toString();
+    if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+    return s;
   }
 
   // ====== Events ======
