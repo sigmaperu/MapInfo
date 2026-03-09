@@ -6,7 +6,7 @@
 <title>ATEII – Atención actual vs propuesta</title>
 
 <!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- PapaParse (CSV) -->
@@ -59,7 +59,7 @@
   #map{ height: calc(100vh - 98px); }
   .legend{
     position:absolute; bottom:12px; left:12px; z-index:600; background:var(--card);
-    border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px; max-width: 320px;
+    border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px; max-width: 360px;
   }
   .legend h4{ margin:0 0 6px 0; font-size:13px; }
   .legend .row{ display:flex; align-items:center; gap:8px; margin:4px 0; flex-wrap:wrap;}
@@ -70,6 +70,8 @@
   .btn{ padding:6px 10px; border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:8px; cursor:pointer;}
   .select{ appearance:none; background:#0b1221; border:1px solid var(--line); color:var(--text); padding:6px 10px; border-radius:8px; }
   .freq{ display:inline-block; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-weight:700; font-size:12px; background:#0b1221; color:#c7d2fe; padding:2px 6px; border-radius:6px; border:1px solid #111827;}
+  .popup-line{ margin:3px 0; }
+  .popup-muted{ color:#9CA3AF; }
 </style>
 </head>
 <body>
@@ -125,10 +127,6 @@
         <span class="toggle"><span class="knob"></span></span>
       </label>
     </div>
-
-    <div class="group">
-      <button id="fitBtn" class="btn" title="Ajustar a puntos y zonas visibles">Ajustar vista</button>
-    </div>
   </div>
 </header>
 
@@ -148,16 +146,16 @@
   const EXCLUDE_DISTRICTS = new Set([
     "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA","VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
   ].map(s => normalize(s)));
-  const EXCLUDE_CODES = new Set(["11747415","11604173","11747406"]);
+  const EXCLUDE_CODES = new Set(["11747415","11604173","11747406","11684549"]); // << añadí 11684549
 
-  // Filtros adicionales (antes excluíamos MOD completo; ahora permitimos MOD salvo nombres no deseados)
-  const EXCLUDE_INTERLOC = "211087";    // col[26]
-  const PROPUESTA_BAJA_VAL = "PROPUESTA BAJA"; // col[55], comparación normalizada
+  // Filtros adicionales
+  const EXCLUDE_INTERLOC = "211087";                    // col[26]
+  const PROPUESTA_BAJA_VAL = "PROPUESTA BAJA";          // col[55], comparación normalizada
 
   // Palabras clave a excluir dentro de CANAL=MOD por nombre (col[7])
   const MOD_EXCLUDE_KEYWORDS = [
     "Plaza vea","SPSA Makro","Economax","Supermercados Peruanos","Mayorsa",
-    "Metro","Cencosud","Tottus","CD Huachipa","Comidas gourmet","Delivery Hero","Ajiles"
+    "Metro","Cencosud","Tottus","CD Huachipa","Comidas gourmet","Delivery Hero","Ajiles","Solana" // << agregado
   ].map(s => normalize(s));
 
   // Mapeo días
@@ -182,7 +180,7 @@
   map.createPane('zonesPane');   map.getPane('zonesPane').style.zIndex = 300;   // zonas debajo
   map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600; // marcadores encima
 
-  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution:'&copy; OpenStreetMap'
   }).addTo(map);
 
@@ -200,7 +198,9 @@
 
   // ====== Utilitarios ======
   function normalize(s){
-    return (s ?? "").toString().normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().trim();
+    // Si el navegador no soporta \p{Diacritic}, hacemos un fallback simple
+    try { return (s ?? "").toString().normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().trim(); }
+    catch(e){ return (s ?? "").toString().toUpperCase().trim(); }
   }
   function normalizeName(s){ return normalize(s).replace(/\s+/g,' '); }
   function num(s){
@@ -282,16 +282,23 @@
       return `<div class="row"><span class="swatch" style="background:${color}"></span> ${canal} <span class="pill">${channelCounts[canal]} clientes</span></div>`;
     }).join("");
 
+    // Resúmenes
+    const partCounts = countByPartWithFilters();
+    const dayCounts  = countByDayWithFilters();
+
     const header = (viewMode === "Actual")
       ? `🎯 Atención actual`
       : `🧭 Propuesta (distritos por parte)`;
 
     legendEl.innerHTML = `
       <h4>${header}</h4>
-      <div class="row"><span class="pill">Día:</span> <span>${selectedDay}</span></div>
-      <div class="row"><span class="pill">Canal:</span> <span>${selectedCanal}</span></div>
+      <div class="row"><span class="pill">Día:</span> <span>${selectedDay}</span> &nbsp; <span class="pill">Canal:</span> <span>${selectedCanal}</span></div>
       <div style="margin:6px 0 4px; color:#94a3b8; font-size:12px;">Canales visibles</div>
       ${items || '<div class="row" style="color:#94a3b8;">(Sin datos)</div>'}
+      <div style="margin:8px 0 4px; color:#94a3b8; font-size:12px;">Resumen por parte</div>
+      <div class="row">A (LJ): <span class="pill">${partCounts.A}</span> &nbsp; B (MV): <span class="pill">${partCounts.B}</span> &nbsp; C (XS): <span class="pill">${partCounts.C}</span></div>
+      <div style="margin:8px 0 4px; color:#94a3b8; font-size:12px;">Resumen por día</div>
+      <div class="row">L: <span class="pill">${dayCounts.L}</span> M: <span class="pill">${dayCounts.M}</span> X: <span class="pill">${dayCounts.X}</span> J: <span class="pill">${dayCounts.J}</span> V: <span class="pill">${dayCounts.V}</span> S: <span class="pill">${dayCounts.S}</span></div>
     `;
   }
 
@@ -317,20 +324,26 @@
     const proposedDaysStr = (r.proposedDays && r.proposedDays.length) ? r.proposedDays.join(", ") : "—";
     const partDays = r.part ? (partToDays[r.part]?.join(" & ")) : "—";
     const distShown = r.geoDistName || r.distrito || "—";
+    const freqNow = r.freqLetters || "—";
+    const freqProp = r.proposedLetters || "—";
     return `
-      <div style="min-width:240px">
-        <div style="font-weight:700; font-size:14px; margin-bottom:6px;">Cliente: ${r.code}</div>
-        <div><strong>Nombre:</strong> ${r.name || "—"}</div>
-        <div><strong>Canal:</strong> ${r.canal || "—"}</div>
-        <div><strong>Distrito (GeoJSON):</strong> ${distShown}</div>
-        <div><strong>Oficina:</strong> ${r.office}</div>
+      <div style="min-width:260px; line-height:1.28;">
+        <div class="popup-line" style="font-weight:700; font-size:14px;">Cliente: ${r.code}</div>
+        <div class="popup-line"><strong>Nombre:</strong> ${escapeHtml(r.name || "")}</div>
+        <div class="popup-line"><strong>Canal:</strong> ${escapeHtml(r.canal || "")}</div>
+        <div class="popup-line"><strong>Distrito (GeoJSON):</strong> ${escapeHtml(distShown)}</div>
+        <div class="popup-line"><strong>Oficina:</strong> ${escapeHtml(r.office || "")}</div>
         <hr style="border:none;border-top:1px solid #1f2937; margin:6px 0;">
-        <div><strong>Frecuencia actual:</strong> <span class="freq">${r.freqLetters || "—"}</span></div>
-        <div><strong>Propuesta:</strong> <span class="freq">${r.proposedLetters || "—"}</span> <span style="color:#9CA3AF">(${proposedDaysStr})</span></div>
-        <div><strong>Parte (distrito):</strong> ${r.part ?? "—"} <span style="color:#9CA3AF">(${partDays})</span></div>
-        <div style="margin-top:6px;">${gm}Abrir en Google Maps ↗</a></div>
+        <div class="popup-line"><strong>Frecuencia actual:</strong> <span class="freq">${freqNow}</span></div>
+        <div class="popup-line"><strong>Propuesta:</strong> <span class="freq">${freqProp}</span> <span class="popup-muted">(${escapeHtml(proposedDaysStr)})</span></div>
+        <div class="popup-line"><strong>Parte (distrito):</strong> ${r.part ?? "—"} <span class="popup-muted">(${escapeHtml(partDays)})</span></div>
+        <div class="popup-line" style="margin-top:6px;"><a href="${gm}" target="_blank" rel="noopener">Abrir en Google Maps ↗</a></div>
       </div>
     `;
+  }
+
+  function escapeHtml(s){
+    return (s ?? "").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
 
   // ====== Render de capas ======
@@ -357,7 +370,6 @@
         }
 
         const color = colorForChannel(r.canal || "");
-
         const marker = L.circleMarker([r.lat, r.lon], {
           pane:'markersPane',
           radius:5.5, stroke:true, weight:1, color:"#0b1221",
@@ -380,7 +392,7 @@
     renderDistrictsColoredByPart();
 
     renderLegend();
-    fitToContent();
+    fitToContent(); // auto-ajuste
   }
 
   // ====== Conteo por CANAL (para leyenda) con filtros activos ======
@@ -399,6 +411,51 @@
       }
       const key = r.canal || "Sin canal";
       counts[key] = (counts[key] || 0) + 1;
+    }
+    return counts;
+  }
+
+  // ====== Conteo por parte con filtros activos ======
+  function countByPartWithFilters(){
+    const useAte = filterOffices.has("OFIC ATE");
+    const useChorri = filterOffices.has("OFIC CHORRILLOS");
+    const validOffice = (oNorm) => ( (oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri) );
+    const counts = {A:0, B:0, C:0};
+    for (const r of records){
+      if (!validOffice(normalize(r.office))) continue;
+      if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+      if (viewMode === "Actual"){
+        if (!(selectedDay === "Todos" ? r.days.length>0 : r.days.includes(selectedDay))) continue;
+      } else {
+        if (!(selectedDay === "Todos" ? true : (r.proposedDays?.includes(selectedDay)))) continue;
+      }
+      if (r.part && counts[r.part] !== undefined) counts[r.part]++;
+    }
+    return counts;
+  }
+
+  // ====== Conteo por día con filtros activos ======
+  function countByDayWithFilters(){
+    const useAte = filterOffices.has("OFIC ATE");
+    const useChorri = filterOffices.has("OFIC CHORRILLOS");
+    const validOffice = (oNorm) => ( (oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri) );
+    const counts = {L:0,M:0,X:0,J:0,V:0,S:0};
+
+    for (const r of records){
+      if (!validOffice(normalize(r.office))) continue;
+      if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+
+      let dayArr = [];
+      if (viewMode === "Actual"){
+        dayArr = r.days;
+      } else {
+        dayArr = r.proposedDays || [];
+      }
+
+      for (const d of dayArr){
+        const letter = dayNameToLetter[d];
+        if (letter && counts[letter] !== undefined) counts[letter]++;
+      }
     }
     return counts;
   }
@@ -429,7 +486,7 @@
       onEachFeature: (feature, layer) => {
         const name = getFeatureDistName(feature);
         layer.on('click', (e) => {
-          L.popup().setLatLng(e.latlng).setContent(`<strong>${name}</strong>`).openOn(map);
+          L.popup().setLatLng(e.latlng).setContent(`<strong>${escapeHtml(name)}</strong>`).openOn(map);
         });
       }
     });
@@ -557,7 +614,7 @@
 
     records = deduped;
 
-    // Poblar el filtro de canales (Todos + encontrados)
+    // Filtro de canales (Todos + encontrados)
     populateCanalFilter(records.map(r=>r.canal).filter(Boolean));
 
     // Particionar y “snap” por distrito GeoJSON
@@ -570,13 +627,8 @@
   function populateCanalFilter(canalList){
     const sel = document.getElementById('canalFilter');
     const uniq = Array.from(new Set(canalList));
-    // limpiar previos salvo "Todos"
     sel.innerHTML = `<option value="Todos">Todos</option>` +
       uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-  }
-
-  function escapeHtml(s){
-    return (s ?? "").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
 
   // ====== Eventos UI ======
@@ -615,8 +667,6 @@
     renderLegend();
     refreshLayers();
   });
-
-  document.getElementById('fitBtn').addEventListener('click', fitToContent);
 
   // ====== Carga GeoJSON + CSV ======
   fetch(GEOJSON_URL)
