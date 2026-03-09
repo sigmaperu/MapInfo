@@ -56,18 +56,19 @@
   input[type="checkbox"].toggle-input{ display:none; }
   input[type="checkbox"].toggle-input:checked + .toggle{ background:#16a34a; }
   input[type="checkbox"].toggle-input:checked + .toggle .knob{ left:23px; }
-  #map{ height: calc(100vh - 92px); }
+  #map{ height: calc(100vh - 98px); }
   .legend{
     position:absolute; bottom:12px; left:12px; z-index:600; background:var(--card);
-    border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px;
+    border:1px solid var(--line); border-radius:10px; padding:10px; font-size:13px; max-width: 320px;
   }
   .legend h4{ margin:0 0 6px 0; font-size:13px; }
-  .legend .row{ display:flex; align-items:center; gap:8px; margin:4px 0; }
+  .legend .row{ display:flex; align-items:center; gap:8px; margin:4px 0; flex-wrap:wrap;}
   .swatch{ width:12px; height:12px; border-radius:2px; border:1px solid #0003; }
   .pill{ font-size:11px; padding:2px 6px; border:1px solid var(--line); border-radius:999px; color:var(--muted);}
   a, a:visited{ color:#93c5fd; text-decoration:none; }
   a:hover{ text-decoration:underline; }
   .btn{ padding:6px 10px; border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:8px; cursor:pointer;}
+  .select{ appearance:none; background:#0b1221; border:1px solid var(--line); color:var(--text); padding:6px 10px; border-radius:8px; }
   .freq{ display:inline-block; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-weight:700; font-size:12px; background:#0b1221; color:#c7d2fe; padding:2px 6px; border-radius:6px; border:1px solid #111827;}
 </style>
 </head>
@@ -102,6 +103,13 @@
         <button data-day="Viernes">V</button>
         <button data-day="Sábado">S</button>
       </div>
+    </div>
+
+    <div class="group">
+      <strong style="font-size:12px;">Canal:</strong>
+      <select id="canalFilter" class="select" title="Filtrar por canal">
+        <option value="Todos">Todos</option>
+      </select>
     </div>
 
     <div class="group">
@@ -140,23 +148,23 @@
   const EXCLUDE_DISTRICTS = new Set([
     "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA","VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
   ].map(s => normalize(s)));
-  const EXCLUDE_CODES = new Set(["11747415","11604173","11747406"]); // << añadidos
+  const EXCLUDE_CODES = new Set(["11747415","11604173","11747406"]);
 
-  // Filtros adicionales
-  const EXCLUDE_CANAL = "MOD";          // col[21]
+  // Filtros adicionales (antes excluíamos MOD completo; ahora permitimos MOD salvo nombres no deseados)
   const EXCLUDE_INTERLOC = "211087";    // col[26]
+  const PROPUESTA_BAJA_VAL = "PROPUESTA BAJA"; // col[55], comparación normalizada
+
+  // Palabras clave a excluir dentro de CANAL=MOD por nombre (col[7])
+  const MOD_EXCLUDE_KEYWORDS = [
+    "Plaza vea","SPSA Makro","Economax","Supermercados Peruanos","Mayorsa",
+    "Metro","Cencosud","Tottus","CD Huachipa","Comidas gourmet","Delivery Hero","Ajiles"
+  ].map(s => normalize(s));
 
   // Mapeo días
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
   const dayNameToLetter = { "Lunes":"L", "Martes":"M", "Miércoles":"X", "Jueves":"J", "Viernes":"V", "Sábado":"S" };
 
-  // Colores por día (Actual)
-  const dayColors = {
-    "Lunes":"#2563eb", "Martes":"#16a34a", "Miércoles":"#7c3aed",
-    "Jueves":"#f59e0b", "Viernes":"#0ea5e9", "Sábado":"#dc2626"
-  };
-
-  // Propuesta por partes
+  // Propuesta por partes (distritos coloreados por parte)
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
   const partColors = { "A":"#1f78b4", "B":"#33a02c", "C":"#6a3d9a" };
@@ -165,6 +173,7 @@
   // ====== Estado UI ======
   let viewMode = "Actual";            // "Actual" | "Propuesta"
   let selectedDay = "Todos";          // "Todos" o nombre de día
+  let selectedCanal = "Todos";        // Filtro por canal
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   let showMarkers = true;
 
@@ -180,15 +189,14 @@
   // Capas
   const currentLayer  = L.layerGroup().addTo(map);                               // markers actuales
   const proposedLayer = L.layerGroup();                                          // markers propuestos
-  // Borde rojo general (opcional)
   const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
-  // Capa de distritos coloreados por parte
-  const districtsLayerHolder = L.layerGroup().addTo(map);
+  const districtsLayerHolder = L.layerGroup().addTo(map);                        // distritos por parte
 
   // ====== Datos ======
   let areaFeatures = null; // FeatureCollection
-  let records = [];        // {code,name,distrito,office,daysRaw,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters}
+  let records = [];        // {code,name,canal,canalNorm,distrito,office,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters}
   let featurePartByIdx = new Map(); // idx -> 'A'|'B'|'C'
+  let channelPalette = {}; // canal -> color
 
   // ====== Utilitarios ======
   function normalize(s){
@@ -248,28 +256,43 @@
     return null;
   }
 
+  // ====== Paleta de colores por CANAL ======
+  const baseColors = [
+    "#22c55e","#eab308","#06b6d4","#f97316","#a855f7","#ef4444","#14b8a6",
+    "#f43f5e","#84cc16","#e879f9","#60a5fa","#f59e0b","#10b981","#8b5cf6"
+  ];
+  function colorForChannel(canal){
+    if (!canal) return "#6b7280";
+    const key = canal;
+    if (channelPalette[key]) return channelPalette[key];
+    // hash simple para asignar color estable
+    let h = 0;
+    for (let i=0; i<key.length; i++) h = (h*31 + key.charCodeAt(i)) >>> 0;
+    const color = baseColors[h % baseColors.length];
+    channelPalette[key] = color;
+    return color;
+  }
+
   // ====== Leyenda ======
   const legendEl = document.getElementById('legend');
   function renderLegend(){
-    if (viewMode === "Actual") {
-      legendEl.innerHTML = `
-        <h4>🎯 Atención actual (dentro del polígono)</h4>
-        ${["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"].map(d=>
-          `<div class="row"><span class="swatch" style="background:${dayColors[d]}"></span> ${d}</div>`).join("")}
-        <div class="row"><span class="pill">Filtro día:</span> <span>${selectedDay}</span></div>
-        <div class="row"><span class="pill">Marcadores:</span> <span>${showMarkers ? "ON" : "OFF"}</span></div>
-      `;
-    } else {
-      const counts = countByPartWithFilters();
-      legendEl.innerHTML = `
-        <h4>🧭 Propuesta equilibrada (3 zonas oeste→este)</h4>
-        <div class="row"><span class="swatch" style="background:${partColors.A}"></span> Parte A → Lunes &amp; Jueves (LJ) <span class="pill">${counts.A} clientes</span></div>
-        <div class="row"><span class="swatch" style="background:${partColors.B}"></span> Parte B → Martes &amp; Viernes (MV) <span class="pill">${counts.B} clientes</span></div>
-        <div class="row"><span class="swatch" style="background:${partColors.C}"></span> Parte C → Miércoles &amp; Sábado (XS) <span class="pill">${counts.C} clientes</span></div>
-        <div class="row"><span class="pill">Filtro día:</span> <span>${selectedDay}</span></div>
-        <div class="row"><span class="pill">Marcadores:</span> <span>${showMarkers ? "ON" : "OFF"}</span></div>
-      `;
-    }
+    const channelCounts = countByChannelWithFilters();
+    const items = Object.keys(channelCounts).sort().map(canal => {
+      const color = colorForChannel(canal);
+      return `<div class="row"><span class="swatch" style="background:${color}"></span> ${canal} <span class="pill">${channelCounts[canal]} clientes</span></div>`;
+    }).join("");
+
+    const header = (viewMode === "Actual")
+      ? `🎯 Atención actual`
+      : `🧭 Propuesta (distritos por parte)`;
+
+    legendEl.innerHTML = `
+      <h4>${header}</h4>
+      <div class="row"><span class="pill">Día:</span> <span>${selectedDay}</span></div>
+      <div class="row"><span class="pill">Canal:</span> <span>${selectedCanal}</span></div>
+      <div style="margin:6px 0 4px; color:#94a3b8; font-size:12px;">Canales visibles</div>
+      ${items || '<div class="row" style="color:#94a3b8;">(Sin datos)</div>'}
+    `;
   }
 
   function fitToContent(){
@@ -298,13 +321,14 @@
       <div style="min-width:240px">
         <div style="font-weight:700; font-size:14px; margin-bottom:6px;">Cliente: ${r.code}</div>
         <div><strong>Nombre:</strong> ${r.name || "—"}</div>
+        <div><strong>Canal:</strong> ${r.canal || "—"}</div>
         <div><strong>Distrito (GeoJSON):</strong> ${distShown}</div>
         <div><strong>Oficina:</strong> ${r.office}</div>
         <hr style="border:none;border-top:1px solid #1f2937; margin:6px 0;">
-        <div><strong>Frecuencia actual:</strong> <span class="freq">${r.freqLetters || "—"}</span> <span style="color:#9CA3AF">(${r.days.join(", ") || "—"})</span></div>
+        <div><strong>Frecuencia actual:</strong> <span class="freq">${r.freqLetters || "—"}</span></div>
         <div><strong>Propuesta:</strong> <span class="freq">${r.proposedLetters || "—"}</span> <span style="color:#9CA3AF">(${proposedDaysStr})</span></div>
-        <div><strong>Parte:</strong> ${r.part ?? "—"} <span style="color:#9CA3AF">(${partDays})</span></div>
-        <div style="margin-top:6px;"><a href="${gm}" target="_blank" rel="noopener">Abrir en Google Maps ↗</a></div>
+        <div><strong>Parte (distrito):</strong> ${r.part ?? "—"} <span style="color:#9CA3AF">(${partDays})</span></div>
+        <div style="margin-top:6px;">${gm}Abrir en Google Maps ↗</a></div>
       </div>
     `;
   }
@@ -321,31 +345,26 @@
     if (showMarkers){
       for (const r of records){
         if (!validOffice(normalize(r.office))) continue;
+        // Filtro por canal
+        if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
 
         if (viewMode === "Actual"){
           const passes = (selectedDay === "Todos") ? r.days.length > 0 : r.days.includes(selectedDay);
           if (!passes) continue;
-          const color = (selectedDay === "Todos") ? (dayColors[r.days[0]] || "#6b7280") : (dayColors[selectedDay] || "#6b7280");
-
-          const marker = L.circleMarker([r.lat, r.lon], {
-            pane:'markersPane',
-            radius:5.5, stroke:true, weight:1, color:"#0b1221",
-            fillColor: color, fillOpacity:0.95
-          }).bindPopup(buildPopUp(r));
-          currentLayer.addLayer(marker);
-
         } else {
           const passes = (selectedDay === "Todos") ? true : (r.proposedDays?.includes(selectedDay));
           if (!passes) continue;
-          const color = partColors[r.part] || "#6b7280";
-
-          const marker = L.circleMarker([r.lat, r.lon], {
-            pane:'markersPane',
-            radius:5.5, stroke:true, weight:1, color:"#0b1221",
-            fillColor: color, fillOpacity:0.95
-          }).bindPopup(buildPopUp(r));
-          proposedLayer.addLayer(marker);
         }
+
+        const color = colorForChannel(r.canal || "");
+
+        const marker = L.circleMarker([r.lat, r.lon], {
+          pane:'markersPane',
+          radius:5.5, stroke:true, weight:1, color:"#0b1221",
+          fillColor: color, fillOpacity:0.95
+        }).bindPopup(buildPopUp(r));
+
+        (viewMode === "Actual" ? currentLayer : proposedLayer).addLayer(marker);
       }
     }
 
@@ -364,26 +383,32 @@
     fitToContent();
   }
 
-  // ====== Conteo por parte (leyenda propuesta) ======
-  function countByPartWithFilters(){
+  // ====== Conteo por CANAL (para leyenda) con filtros activos ======
+  function countByChannelWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
     const validOffice = (oNorm) => ( (oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri) );
-    const counts = {A:0, B:0, C:0};
+    const counts = {};
     for (const r of records){
       if (!validOffice(normalize(r.office))) continue;
-      if (selectedDay !== "Todos" && !(r.proposedDays?.includes(selectedDay))) continue;
-      if (r.part && counts[r.part] !== undefined) counts[r.part]++;
+      if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+      if (viewMode === "Actual"){
+        if (!(selectedDay === "Todos" ? r.days.length>0 : r.days.includes(selectedDay))) continue;
+      } else {
+        if (!(selectedDay === "Todos" ? true : (r.proposedDays?.includes(selectedDay)))) continue;
+      }
+      const key = r.canal || "Sin canal";
+      counts[key] = (counts[key] || 0) + 1;
     }
     return counts;
   }
 
-  // ====== Pintar distritos con color de su parte y popup con nombre ======
+  // ====== Distritos coloreados por parte y popup con nombre ======
   function renderDistrictsColoredByPart(){
     districtsLayerHolder.clearLayers();
     if (!areaFeatures) return;
 
-    // GeoJSON puede perder el índice; agregamos __idx estable
+    // GeoJSON con índice estable
     areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
 
     const districtsLayer = L.geoJSON(areaFeatures, {
@@ -399,7 +424,6 @@
             fillOpacity: 0.18
           };
         }
-        // Sin parte asignada: borde tenue, sin relleno
         return { color:'#ef4444', weight:1, fillOpacity:0 };
       },
       onEachFeature: (feature, layer) => {
@@ -475,7 +499,7 @@
 
       const name = (row[7] ?? "").toString().trim();
       const canal = (row[21] ?? "").toString().trim();   // col[21]
-      const interloc = (row[26] ?? "").toString().trim(); // col[26]
+      const interloc = (row[26] ?? "").toString().trim();// col[26]
       const lat = num(row[28]);
       const lon = num(row[29]);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
@@ -491,9 +515,20 @@
       const geoDistNorm = normalize(geoDistName);
       if (EXCLUDE_DISTRICTS.has(geoDistNorm)) continue;
 
-      // Filtros adicionales
-      if (normalize(canal) === normalize(EXCLUDE_CANAL)) continue; // Canal MOD
-      if (interloc === EXCLUDE_INTERLOC) continue;                 // Interlocutor 211087
+      // Filtro por Propuesta baja (col[55])
+      const propuestaFlag = (row[55] ?? "").toString().trim();
+      if (normalize(propuestaFlag) === PROPUESTA_BAJA_VAL) continue;
+
+      // Filtro por interlocutor
+      if (interloc === EXCLUDE_INTERLOC) continue;
+
+      // Reglas de CANAL (permitir MOD salvo keywords en nombre)
+      const canalNorm = normalize(canal);
+      const nameNorm = normalizeName(name);
+      if (canalNorm === "MOD"){
+        const hit = MOD_EXCLUDE_KEYWORDS.some(k => nameNorm.includes(k));
+        if (hit) continue; // excluir MOD con estos nombres
+      }
 
       const csvDistrito = (row[17] ?? "").toString().trim();
       const daysRaw = (row[48] ?? "").toString().trim();
@@ -501,7 +536,7 @@
       const freqLetters = toFreqLetters(days);
 
       prelim.push({
-        code, name, distrito: csvDistrito, office,
+        code, name, canal, canalNorm, distrito: csvDistrito, office,
         daysRaw, days, freqLetters, lat, lon,
         featIdx: container.idx, geoDistName
       });
@@ -522,11 +557,26 @@
 
     records = deduped;
 
+    // Poblar el filtro de canales (Todos + encontrados)
+    populateCanalFilter(records.map(r=>r.canal).filter(Boolean));
+
     // Particionar y “snap” por distrito GeoJSON
     assignBalancedPartsAndSnapToDistricts();
 
     // Pintar
     refreshLayers();
+  }
+
+  function populateCanalFilter(canalList){
+    const sel = document.getElementById('canalFilter');
+    const uniq = Array.from(new Set(canalList));
+    // limpiar previos salvo "Todos"
+    sel.innerHTML = `<option value="Todos">Todos</option>` +
+      uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  }
+
+  function escapeHtml(s){
+    return (s ?? "").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
 
   // ====== Eventos UI ======
@@ -542,6 +592,11 @@
       selectedDay = e.target.dataset.day;
       refreshLayers();
     }
+  });
+
+  document.getElementById('canalFilter').addEventListener('change', (e)=>{
+    selectedCanal = e.target.value || "Todos";
+    refreshLayers();
   });
 
   document.getElementById('oficAte').addEventListener('change', (e)=>{
