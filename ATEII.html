@@ -6,7 +6,7 @@
 <title>ATEII – Atención actual vs propuesta</title>
 
 <!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- PapaParse (CSV) -->
@@ -16,19 +16,17 @@
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
 <style>
-  /* ===== Material Design (dark) tokens ===== */
+  /* ===== Material Design (dark) tokens (compact) ===== */
   :root{
     --md-bg:#0b0f14;
     --md-surface:#0f1520;
     --md-surface-2:#121a26;
-    --md-outline:#263244;
+    --md-outline:#243245;
     --md-text:#e6edf3;
     --md-muted:#9fb0c3;
-    --md-primary:#7c4dff;     /* M3 Primary (violet) */
-    --md-primary-ctr:#1b1033;
-    --md-secondary:#03dac6;   /* teal */
+    --md-primary:#7c4dff;   /* Primary */
+    --md-secondary:#03dac6; /* Secondary */
     --chip-bg:#0d1522;
-    --chip-on:#2a3b54;
     --elev: 0 2px 10px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
   }
   *{ box-sizing:border-box }
@@ -38,51 +36,51 @@
   }
   header{
     position:sticky; top:0; z-index:1000;
-    padding:12px 14px; border-bottom:1px solid var(--md-outline);
-    display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+    padding:8px 10px; border-bottom:1px solid var(--md-outline);
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
     background:linear-gradient(180deg, #0b0f14 0%, #0f1520 100%); box-shadow:var(--elev);
   }
-  h1{ font-size:16px; margin:0; letter-spacing:.2px; font-weight:700; }
-  .muted{ color:var(--md-muted); font-size:12px; }
-  .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  h1{ font-size:15px; margin:0; letter-spacing:.2px; font-weight:700; }
+  .muted{ color:var(--md-muted); font-size:11px; }
+  .controls{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .group{
-    display:flex; gap:8px; align-items:center; padding:8px 10px;
-    background:var(--md-surface-2); border:1px solid var(--md-outline); border-radius:12px;
+    display:flex; gap:6px; align-items:center; padding:6px 8px;
+    background:var(--md-surface-2); border:1px solid var(--md-outline); border-radius:10px;
   }
   .segmented{
-    display:flex; overflow:hidden; border-radius:10px; border:1px solid var(--md-outline); background:var(--chip-bg);
+    display:flex; overflow:hidden; border-radius:9px; border:1px solid var(--md-outline); background:var(--chip-bg);
   }
   .segmented button{
-    background:transparent; color:var(--md-text); border:0; padding:6px 10px; cursor:pointer; font-weight:600;
+    background:transparent; color:var(--md-text); border:0; padding:5px 8px; cursor:pointer; font-weight:600; font-size:12px;
   }
   .segmented button.active{ background:var(--md-primary); color:#0a0716; }
   .segmented button + button{ border-left:1px solid var(--md-outline); }
-  label.switch{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none; font-weight:600; }
+  label.switch{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none; font-weight:600; font-size:12px;}
   .toggle{
-    width:48px; height:26px; background:#0b1320; border:1px solid var(--md-outline); border-radius:999px; position:relative; transition:.2s;
+    width:44px; height:24px; background:#0b1320; border:1px solid var(--md-outline); border-radius:999px; position:relative; transition:.2s;
   }
-  .knob{ width:22px; height:22px; background:#fff; border-radius:50%; position:absolute; top:1.5px; left:1.5px; transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,.5);}
+  .knob{ width:20px; height:20px; background:#fff; border-radius:50%; position:absolute; top:1.5px; left:1.5px; transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,.5);}
   input[type="checkbox"].toggle-input{ display:none; }
   input[type="checkbox"].toggle-input:checked + .toggle{ background:var(--md-secondary); }
-  input[type="checkbox"].toggle-input:checked + .toggle .knob{ left:24px; }
+  input[type="checkbox"].toggle-input:checked + .toggle .knob{ left:22px; }
   .select{
-    appearance:none; background:#0b1320; border:1px solid var(--md-outline); color:var(--md-text); padding:8px 12px; border-radius:10px;
-    font-weight:600;
+    appearance:none; background:#0b1320; border:1px solid var(--md-outline); color:var(--md-text); padding:6px 8px; border-radius:9px;
+    font-weight:600; font-size:12px;
   }
   .btn{
-    padding:8px 12px; border:1px solid var(--md-outline); background:var(--md-primary-ctr);
-    color:#dcd3ff; border-radius:10px; cursor:pointer; font-weight:700; letter-spacing:.3px;
+    padding:6px 10px; border:1px solid var(--md-outline); background:#1a2030;
+    color:#dcd3ff; border-radius:9px; cursor:pointer; font-weight:700; letter-spacing:.3px; font-size:12px;
   }
-  .btn:hover{ filter:brightness(1.15); }
-  #map{ height: calc(100vh - 106px); }
+  .btn:hover{ filter:brightness(1.12); }
+  #map{ height: calc(100vh - 86px); }
   .legend{
     position:absolute; bottom:12px; left:12px; z-index:600; background:var(--md-surface);
-    border:1px solid var(--md-outline); border-radius:14px; padding:12px; font-size:13px; max-width: 420px; box-shadow:var(--elev);
+    border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width: 380px; box-shadow:var(--elev);
   }
-  .legend h4{ margin:0 0 8px 0; font-size:13px; }
-  .legend .row{ display:flex; align-items:center; gap:8px; margin:4px 0; flex-wrap:wrap;}
+  .legend h4{ margin:0 0 6px 0; font-size:12px; }
+  .legend .row{ display:flex; align-items:center; gap:6px; margin:4px 0; flex-wrap:wrap;}
   .swatch{ width:12px; height:12px; border-radius:2px; border:1px solid #0003; }
-  .pill{ font-size:11px; padding:3px 8px; border:1px solid var(--md-outline); border-radius:999px; color:var(--md-muted); background:var(--chip-bg);}
+  .pill{ font-size:10px; padding:2px 6px; border:1px solid var(--md-outline); border-radius:999px; color:var(--md-muted); background:var(--chip-bg);}
   a, a:visited{ color:#93c5fd; text-decoration:none; }
   a:hover{ text-decoration:underline; }
   .freq{
@@ -91,14 +89,15 @@
   }
   .popup-line{ margin:3px 0; }
   .popup-muted{ color:#9CA3AF; }
-  /* material tooltips for districts */
   .leaflet-tooltip { background:#101826; color:#dbe7f3; border:1px solid #223144; border-radius:10px; box-shadow:var(--elev); }
+  /* mover zoom a esquina inferior derecha (si el control está activo) */
+  .leaflet-control-container .leaflet-bottom.leaflet-right { right: 16px; bottom: 16px; }
 </style>
 </head>
 <body>
 
 <header>
-  <div style="display:flex; flex-direction:column;">
+  <div style="display:flex; flex-direction:column; gap:2px;">
     <h1>ATEII · Mapa de atención</h1>
     <div class="muted">CSV: raw GitHub (Catálogo Sigma) · GeoJSON: distritos (RoadMap)</div>
   </div>
@@ -116,7 +115,7 @@
 
     <!-- Filtro de día -->
     <div class="group">
-      <strong style="font-size:12px;">Día:</strong>
+      <strong style="font-size:11px;">Día:</strong>
       <div id="dayFilter" class="segmented" role="tablist" aria-label="Filtro de día">
         <button data-day="Todos" class="active">Todos</button>
         <button data-day="Lunes">L</button>
@@ -130,7 +129,7 @@
 
     <!-- Filtro por canal -->
     <div class="group">
-      <strong style="font-size:12px;">Canal:</strong>
+      <strong style="font-size:11px;">Canal:</strong>
       <select id="canalFilter" class="select" title="Filtrar por canal">
         <option value="Todos">Todos</option>
       </select>
@@ -138,7 +137,7 @@
 
     <!-- Oficinas -->
     <div class="group">
-      <strong style="font-size:12px;">Oficina:</strong>
+      <strong style="font-size:11px;">Oficina:</strong>
       <label><input type="checkbox" id="oficAte" checked> <span class="pill">Ofic Ate</span></label>
       <label><input type="checkbox" id="oficChorri" checked> <span class="pill">Ofic Chorrillos</span></label>
     </div>
@@ -152,8 +151,8 @@
       </label>
     </div>
 
-    <!-- +Z3: solo clientes que tenían >2 días (aplica en Propuesta) -->
-    <div class="group" title="Mostrar solo clientes que tenían más de 2 días actuales (solo en Propuesta)">
+    <!-- +Z3: solo clientes que tenían >2 días (aplica en Actual y Propuesta) -->
+    <div class="group" title="Mostrar solo clientes que tenían más de 2 días actuales (Actual y Propuesta)">
       <label class="switch">
         <span>+Z3</span>
         <input id="z3Toggle" class="toggle-input" type="checkbox" />
@@ -208,10 +207,13 @@
   let selectedCanal = "Todos";
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   let showMarkers = true;
-  let filterZ3 = false; // << nuevo
+  let filterZ3 = false; // << ahora aplica en Actual y Propuesta
 
   // ====== Map & panes ======
-  const map = L.map('map', { preferCanvas:true });
+  const map = L.map('map', { preferCanvas:true, zoomControl:false });
+  // Zoom abajo-derecha
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
   map.createPane('zonesPane');   map.getPane('zonesPane').style.zIndex = 300;
   map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600;
 
@@ -247,7 +249,6 @@
     const s = (raw ?? "").toString().toUpperCase().replace(/[^LMXJVS]/g,"");
     const set = new Set();
     for (const ch of s) if (dayLetterToName[ch]) set.add(dayLetterToName[ch]);
-    // Asegurar orden consistente
     return orderDays.filter(d => set.has(d));
   }
   function toFreqLetters(dayArr){
@@ -258,22 +259,15 @@
   const DIST_KEYS = ["NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist","nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"];
   function getFeatureDistName(f){
     const p = f?.properties || {};
-    for (const k of DIST_KEYS){
-      if (p[k] && typeof p[k] === "string" && p[k].trim().length) return p[k].trim();
-    }
-    for (const k in p){
-      if (typeof p[k] === "string" && p[k].trim().length) return p[k].trim();
-    }
+    for (const k of DIST_KEYS){ if (p[k] && typeof p[k] === "string" && p[k].trim().length) return p[k].trim(); }
+    for (const k in p){ if (typeof p[k] === "string" && p[k].trim().length) return p[k].trim(); }
     return "Distrito";
   }
   function getContainingFeature(lat, lon){
     if (!areaFeatures) return null;
     const pt = turf.point([lon, lat]);
     const feats = areaFeatures.features || [];
-    for (let i=0; i<feats.length; i++){
-      const f = feats[i];
-      if (turf.booleanPointInPolygon(pt, f)) return { idx:i, name:getFeatureDistName(f) };
-    }
+    for (let i=0; i<feats.length; i++){ const f=feats[i]; if (turf.booleanPointInPolygon(pt, f)) return { idx:i, name:getFeatureDistName(f) }; }
     return null;
   }
 
@@ -300,7 +294,7 @@
     const dayCounts  = countByDayWithFilters();
 
     const header = (viewMode === "Actual") ? `🎯 Atención actual` : `🧭 Propuesta (distritos por parte)`;
-    const z3 = (filterZ3 && viewMode==="Propuesta") ? `<span class="pill">+Z3</span>` : ``;
+    const z3 = (filterZ3) ? `<span class="pill">+Z3</span>` : ``;
 
     legendEl.innerHTML = `
       <h4>${header} ${z3}</h4>
@@ -323,9 +317,7 @@
     if (map.hasLayer(districtsLayerHolder)) layers.push(districtsLayerHolder);
     for (const l of layers){
       const b = l.getBounds?.();
-      if (b && b.isValid()){
-        bounds = bounds ? bounds.extend(b) : b;
-      }
+      if (b && b.isValid()) bounds = bounds ? bounds.extend(b) : b;
     }
     if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.08));
     else map.setView([-12.0464, -77.0428], 10);
@@ -369,15 +361,15 @@
         if (!validOffice(normalize(r.office))) continue;
         if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
 
-        // Con Día = "Todos" NO filtramos por día en ninguna vista
+        // Con Día = "Todos" NO filtramos por día
         let dayPass = true;
         if (selectedDay !== "Todos"){
           dayPass = (viewMode === "Actual") ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay));
         }
         if (!dayPass) continue;
 
-        // +Z3: solo en Propuesta
-        if (viewMode === "Propuesta" && filterZ3 && !r.hadZ3) continue;
+        // +Z3 aplica en ambas vistas: si está ON, sólo quienes tenían >2 días actuales
+        if (filterZ3 && !r.hadZ3) continue;
 
         const color = colorForChannel(r.canal || "");
         const marker = L.circleMarker([r.lat, r.lon], {
@@ -398,15 +390,13 @@
       if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
     }
 
-    renderDistrictsColoredByPart();
+    renderDistrictsColoredByPart(); // incluye tooltip y popup de distrito
     renderLegend();
     fitToContent();
   }
 
   // ====== Resúmenes ======
-  function passesZ3(r){
-    return !(viewMode === "Propuesta" && filterZ3 && !r.hadZ3);
-  }
+  function passesZ3(r){ return !(filterZ3 && !r.hadZ3); }
   function countByChannelWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -463,7 +453,7 @@
     return counts;
   }
 
-  // ====== Distritos pintados por parte (con tooltip y popup-resumen) ======
+  // ====== Distritos (color por parte + tooltip + popup-resumen) ======
   function renderDistrictsColoredByPart(){
     districtsLayerHolder.clearLayers();
     if (!areaFeatures) return;
@@ -475,14 +465,15 @@
         const idx = feature.properties.__idx;
         const part = featurePartByIdx.get(idx);
         if (part){
-          return { color: partColors[part], weight: 1.2, fillColor: partFill[part], fillOpacity: 0.18 };
+          return { color: partColors[part], weight: 1.1, fillColor: partFill[part], fillOpacity: 0.18 };
         }
         return { color:'#ef4444', weight:1, fillOpacity:0 };
       },
       onEachFeature: (feature, polygonLayer) => {
         const name = getFeatureDistName(feature);
-        polygonLayer.bindTooltip(name, {direction:'center', opacity:0.9, sticky:true});
-
+        // Tooltip de distrito (hover) — aseguramos que se cree siempre
+        polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false});
+        // Popup resumen (click)
         polygonLayer.on('click', (e) => {
           const idx = feature.properties.__idx;
           const resume = summarizeDistrict(idx);
@@ -525,17 +516,14 @@
   // ====== Partición y “snap” ======
   function assignBalancedPartsAndSnapToDistricts(){
     const sorted = [...records].sort((a,b)=>a.lon - b.lon);
-    const n = sorted.length;
-    if (n === 0) return;
-    const size = Math.ceil(n / 3);
-    const cut1 = size, cut2 = size * 2;
+    const n = sorted.length; if (n === 0) return;
+    const size = Math.ceil(n / 3), cut1 = size, cut2 = size * 2;
     for (let i=0; i<n; i++){
       const r = sorted[i];
       r.part = (i < cut1) ? "A" : (i < cut2 ? "B" : "C");
       r.proposedDays = partToDays[r.part];
       r.proposedLetters = partToFreqLetters[r.part];
     }
-
     const byFeat = new Map();
     for (const r of records){
       const k = r.featIdx; if (k == null) continue;
@@ -604,7 +592,7 @@
         code, name, canal, canalNorm, distrito: csvDistrito, office, route,
         daysRaw, days, freqLetters, lat, lon,
         featIdx: container.idx, geoDistName,
-        hadZ3: days.length > 2   // << clientes con más de 2 días actuales
+        hadZ3: days.length > 2   // << marcador Z3
       });
     }
 
@@ -632,7 +620,7 @@
     sel.innerHTML = `<option value="Todos">Todos</option>` + uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
   }
 
-  // ====== Export CSV (respeta filtros) ======
+  // ====== Export CSV ======
   document.getElementById('exportBtn').addEventListener('click', ()=>{
     const rows = getFilteredRowsForExport();
     const headers = [
@@ -660,7 +648,7 @@
     for (const r of records){
       if (!validOffice(normalize(r.office))) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
-      if (!passesZ3(r)) continue;
+      if (filterZ3 && !r.hadZ3) continue;
 
       const pass = (selectedDay === "Todos") ? true :
                    (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay)));
@@ -670,7 +658,6 @@
     }
     return out;
   }
-
   function csvEscape(v){
     const s = (v ?? "").toString();
     if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
