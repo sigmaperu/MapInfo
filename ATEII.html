@@ -4,13 +4,17 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>ATEII – Atención actual vs propuesta</title>
-<!-- Leaflet -->
+
+<!-- Leaflet (CSS + JS) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <!-- PapaParse (CSV) -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
 <!-- Turf.js (geo utilidades) -->
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+
 <style>
  /* ===== Material Design (dark) tokens (compact) ===== */
  :root{
@@ -156,10 +160,12 @@
 </header>
 <div id="map" role="application" aria-label="Mapa Leaflet de atención a clientes"></div>
 <div class="legend" id="legend"></div>
+
 <script>
 (function(){
   const CSV_URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
   const GEOJSON_URL = "https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson";
+
   // ====== Config ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   const EXCLUDE_DISTRICTS = new Set([
@@ -168,11 +174,12 @@
   const EXCLUDE_CODES = new Set(["11747415","11604173","11747406","11684549"]);
   const EXCLUDE_INTERLOC = "211087"; // col[26]
   const PROPUESTA_BAJA_VAL = "PROPUESTA BAJA"; // col[55], comparación normalizada
-  // MOD permitido salvo estos nombres
+
   const MOD_EXCLUDE_KEYWORDS = [
     "Plaza vea","SPSA Makro","Economax","Supermercados Peruanos","Mayorsa",
     "Metro","Cencosud","Tottus","CD Huachipa","Comidas gourmet","Delivery Hero","Ajiles","Solana"
   ].map(s => normalize(s));
+
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
   const dayNameToLetter = { "Lunes":"L", "Martes":"M", "Miércoles":"X", "Jueves":"J", "Viernes":"V", "Sábado":"S" };
   const orderDays = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -187,15 +194,16 @@
   let selectedCanal = "Todos";
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   let showMarkers = true;
-  let filterZ3 = false; // << ahora aplica en Actual y Propuesta
+  let filterZ3 = false;
 
   // ====== Map & panes ======
   const map = L.map('map', { preferCanvas:true, zoomControl:false });
-  // Zoom abajo-derecha
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   map.createPane('zonesPane'); map.getPane('zonesPane').style.zIndex = 300;
   map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600;
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
+
   const currentLayer = L.layerGroup().addTo(map);
   const proposedLayer = L.layerGroup();
   const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
@@ -203,7 +211,7 @@
 
   // ====== Data ======
   let areaFeatures = null;
-  let records = []; // {code,name,canal,canalNorm,distrito,office,route,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters, hadZ3:boolean}
+  let records = [];
   let featurePartByIdx = new Map();
   let channelPalette = {};
 
@@ -263,7 +271,7 @@
       .replace(/'/g,  "&#39;");
   }
 
-  // ====== Legend ======
+  // ====== Leyenda ======
   const legendEl = document.getElementById('legend');
   function renderLegend(){
     const channelCounts = countByChannelWithFilters();
@@ -332,24 +340,54 @@
   function renderDistrictsColoredByPart(){
     districtsLayerHolder.clearLayers();
     if (!areaFeatures) return;
+
     areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
+
+    // estilo base y estilo destacado
+    const baseStyle = (part) => part
+      ? { color: partColors[part], weight: 1.1, fillColor: partFill[part], fillOpacity: 0.18 }
+      : { color:'#ef4444', weight:1, fillColor:'#000', fillOpacity:0.10 };
+
+    const highlightStyle = (part) => part
+      ? { color: partColors[part], weight: 2.2, fillColor: partFill[part], fillOpacity: 0.32 }
+      : { color:'#ef4444', weight: 2.2, fillColor:'#000', fillOpacity:0.22 };
+
     const layer = L.geoJSON(areaFeatures, {
       pane:'zonesPane',
       style: (feature) => {
         const idx = feature.properties.__idx;
         const part = featurePartByIdx.get(idx);
-        if (part){
-          return { color: partColors[part], weight: 1.1, fillColor: partFill[part], fillOpacity: 0.18 };
-        }
-        return { color:'#ef4444', weight:1, fillColor:'#000', fillOpacity:0.10 };
+        return baseStyle(part);
       },
       onEachFeature: (feature, polygonLayer) => {
-        const name = getFeatureDistName(feature);
-        // Tooltip de distrito (hover) — siempre visible al pasar el mouse
-        polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false});
-        // Asegurar interacción
+        // Asegurar que el polígono reciba eventos
         polygonLayer.options.interactive = true;
-        // Popup resumen (click)
+
+        const name = getFeatureDistName(feature);
+        polygonLayer.bindTooltip(name, {
+          direction:'auto',
+          opacity:0.95,
+          sticky:true,
+          className:'district-tip',
+          permanent:false
+        });
+
+        // Abrir tooltip en hover y resaltar polígono
+        polygonLayer.on('mouseover', (e) => {
+          const idx = feature.properties.__idx;
+          const part = featurePartByIdx.get(idx);
+          polygonLayer.setStyle(highlightStyle(part));
+          polygonLayer.openTooltip(e.latlng);
+        });
+
+        // Restablecer estilo al salir
+        polygonLayer.on('mouseout', () => {
+          const idx = feature.properties.__idx;
+          const part = featurePartByIdx.get(idx);
+          polygonLayer.setStyle(baseStyle(part));
+        });
+
+        // Popup resumen en click
         polygonLayer.on('click', (e) => {
           const idx = feature.properties.__idx;
           const resume = summarizeDistrict(idx);
@@ -364,6 +402,7 @@
         });
       }
     });
+
     layer.addTo(districtsLayerHolder);
   }
 
@@ -379,7 +418,7 @@
       if (r.featIdx !== featIdx) continue;
       if (!validOffice(normalize(r.office))) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
-      if (!passesZ3(r)) continue;
+      if (!(filterZ3 ? r.hadZ3 : true)) continue;
       const pass = (selectedDay === "Todos") ? true :
         (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay)));
       if (!pass) continue;
@@ -405,13 +444,11 @@
       for (const r of records){
         if (!validOffice(normalize(r.office))) continue;
         if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
-        // Con Día = "Todos" NO filtramos por día
         let dayPass = true;
         if (selectedDay !== "Todos"){
           dayPass = (viewMode === "Actual") ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay));
         }
         if (!dayPass) continue;
-        // +Z3 aplica en ambas vistas: si está ON, sólo quienes tenían >2 días actuales
         if (filterZ3 && !r.hadZ3) continue;
 
         const color = colorForChannel(r.canal || "");
@@ -432,7 +469,7 @@
       if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
     }
 
-    renderDistrictsColoredByPart(); // incluye tooltip y popup de distrito
+    renderDistrictsColoredByPart();
     renderLegend();
     fitToContent();
   }
@@ -550,12 +587,9 @@
       const geoDistName = container.name;
       const geoDistNorm = normalize(geoDistName);
       if (EXCLUDE_DISTRICTS.has(geoDistNorm)) continue;
-      // col[55]: Propuesta baja -> excluir
       const propuestaFlag = (row[55] ?? "").toString().trim();
       if (normalize(propuestaFlag) === PROPUESTA_BAJA_VAL) continue;
-      // interlocutor excluido
       if (interloc === EXCLUDE_INTERLOC) continue;
-      // MOD permitido salvo keywords en nombre
       const canalNorm = normalize(canal);
       const nameNorm = normalizeName(name);
       if (canalNorm === "MOD"){
@@ -570,21 +604,18 @@
         code, name, canal, canalNorm, distrito: csvDistrito, office, route,
         daysRaw, days, freqLetters, lat, lon,
         featIdx: container.idx, geoDistName,
-        hadZ3: days.length > 2 // << marcador Z3
+        hadZ3: days.length > 2
       });
     }
-    // Deduplicación Nombre+Lat/Lon
     const seen = new Set(); const deduped = [];
     for (const r of prelim){
       const key = `${normalizeName(r.name||"")}${Number.isFinite(r.lat)?r.lat.toFixed(6):""}${Number.isFinite(r.lon)?r.lon.toFixed(6):""}`;
       if (seen.has(key)) continue; seen.add(key); deduped.push(r);
     }
     records = deduped;
-    // Filtro de canales (Todos + encontrados)
+
     populateCanalFilter(records.map(r=>r.canal).filter(Boolean));
-    // Particionar y snap
     assignBalancedPartsAndSnapToDistricts();
-    // Render
     refreshLayers();
   }
 
@@ -612,6 +643,7 @@
     a.href = url; a.download = "ATEII_export.csv"; a.click();
     URL.revokeObjectURL(url);
   });
+
   function getFilteredRowsForExport(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -631,6 +663,7 @@
     }
     return out;
   }
+
   function csvEscape(v){
     const s = (v ?? "").toString();
     if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
@@ -651,7 +684,7 @@
   document.getElementById('markersToggle').addEventListener('change', (e)=>{ showMarkers = e.target.checked; renderLegend(); refreshLayers(); });
   document.getElementById('z3Toggle').addEventListener('change', (e)=>{ filterZ3 = e.target.checked; renderLegend(); refreshLayers(); });
 
-  // ====== Load GeoJSON + CSV ======
+  // ====== Carga GeoJSON + CSV ======
   fetch(GEOJSON_URL)
     .then(r => r.json())
     .then(geo => {
@@ -674,10 +707,9 @@
       });
     });
 
-  // ====== Inicializa
-  renderLegend(); // pinta inicialmente leyenda vacía
+  // Pintar leyenda inicial (vacía) para no ver parpadeo
+  renderLegend();
 })();
 </script>
 </body>
 </html>
-``
