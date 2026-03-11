@@ -328,6 +328,67 @@
     `;
   }
 
+  // ====== Distritos (color por parte + tooltip + popup-resumen) ======
+  function renderDistrictsColoredByPart(){
+    districtsLayerHolder.clearLayers();
+    if (!areaFeatures) return;
+    areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
+    const layer = L.geoJSON(areaFeatures, {
+      pane:'zonesPane',
+      style: (feature) => {
+        const idx = feature.properties.__idx;
+        const part = featurePartByIdx.get(idx);
+        if (part){
+          return { color: partColors[part], weight: 1.1, fillColor: partFill[part], fillOpacity: 0.18 };
+        }
+        return { color:'#ef4444', weight:1, fillColor:'#000', fillOpacity:0.10 };
+      },
+      onEachFeature: (feature, polygonLayer) => {
+        const name = getFeatureDistName(feature);
+        // Tooltip de distrito (hover) — siempre visible al pasar el mouse
+        polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false});
+        // Asegurar interacción
+        polygonLayer.options.interactive = true;
+        // Popup resumen (click)
+        polygonLayer.on('click', (e) => {
+          const idx = feature.properties.__idx;
+          const resume = summarizeDistrict(idx);
+          const html = `
+            <div style="min-width:220px">
+              <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(name)}</div>
+              <div>Total clientes (visibles): <strong>${resume.total}</strong></div>
+              <div>Por parte → A: <strong>${resume.A}</strong> · B: <strong>${resume.B}</strong> · C: <strong>${resume.C}</strong></div>
+            </div>
+          `;
+          L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+        });
+      }
+    });
+    layer.addTo(districtsLayerHolder);
+  }
+
+  function summarizeDistrict(featIdx){
+    const useAte = filterOffices.has("OFIC ATE");
+    const useChorri = filterOffices.has("OFIC CHORRILLOS");
+    const validOffice = (oNorm) => (
+      (oNorm === "OFIC ATE" && useAte) ||
+      (oNorm === "OFIC CHORRILLOS" && useChorri)
+    );
+    const res = { total:0, A:0, B:0, C:0 };
+    for (const r of records){
+      if (r.featIdx !== featIdx) continue;
+      if (!validOffice(normalize(r.office))) continue;
+      if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+      if (!passesZ3(r)) continue;
+      const pass = (selectedDay === "Todos") ? true :
+        (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay)));
+      if (!pass) continue;
+      res.total++;
+      if (r.part && res[r.part] !== undefined) res[r.part]++;
+    }
+    return res;
+  }
+
   // ====== Rendering ======
   function refreshLayers(){
     currentLayer.clearLayers();
@@ -436,64 +497,6 @@
       }
     }
     return counts;
-  }
-
-  // ====== Distritos (color por parte + tooltip + popup-resumen) ======
-  function renderDistrictsColoredByPart(){
-    districtsLayerHolder.clearLayers();
-    if (!areaFeatures) return;
-    areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
-    const layer = L.geoJSON(areaFeatures, {
-      pane:'zonesPane',
-      style: (feature) => {
-        const idx = feature.properties.__idx;
-        const part = featurePartByIdx.get(idx);
-        if (part){
-          return { color: partColors[part], weight: 1.1, fillColor: partFill[part], fillOpacity: 0.18 };
-        }
-        return { color:'#ef4444', weight:1, fillOpacity:0 };
-      },
-      onEachFeature: (feature, polygonLayer) => {
-        const name = getFeatureDistName(feature);
-        // Tooltip de distrito (hover) — aseguramos que se cree siempre
-        polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false});
-        // Popup resumen (click)
-        polygonLayer.on('click', (e) => {
-          const idx = feature.properties.__idx;
-          const resume = summarizeDistrict(idx);
-          const html = `
-            <div style="min-width:220px">
-              <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(name)}</div>
-              <div>Total clientes (visibles): <strong>${resume.total}</strong></div>
-              <div>Por parte → A: <strong>${resume.A}</strong> · B: <strong>${resume.B}</strong> · C: <strong>${resume.C}</strong></div>
-            </div>
-          `;
-          L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
-        });
-      }
-    });
-    layer.addTo(districtsLayerHolder);
-  }
-  function summarizeDistrict(featIdx){
-    const useAte = filterOffices.has("OFIC ATE");
-    const useChorri = filterOffices.has("OFIC CHORRILLOS");
-    const validOffice = (oNorm) => (
-      (oNorm === "OFIC ATE" && useAte) ||
-      (oNorm === "OFIC CHORRILLOS" && useChorri)
-    );
-    const res = { total:0, A:0, B:0, C:0 };
-    for (const r of records){
-      if (r.featIdx !== featIdx) continue;
-      if (!validOffice(normalize(r.office))) continue;
-      if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
-      if (!passesZ3(r)) continue;
-      const pass = (selectedDay === "Todos") ? true :
-        (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay)));
-      if (!pass) continue;
-      res.total++;
-      if (r.part && res[r.part] !== undefined) res[r.part]++;
-    }
-    return res;
   }
 
   // ====== Partición y “snap” ======
@@ -670,7 +673,11 @@
         complete: (results) => { const rows=results.data; if (!rows || !rows.length){ alert("No se pudo leer el CSV o está vacío."); return; } alert("Advertencia: no se aplicó el filtro por polígono (GeoJSON no disponible)."); ingestRows(rows); }
       });
     });
+
+  // ====== Inicializa
+  renderLegend(); // pinta inicialmente leyenda vacía
 })();
 </script>
 </body>
 </html>
+``
