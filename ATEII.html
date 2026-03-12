@@ -154,8 +154,10 @@
     </div>
   </div>
 </header>
+
 <div id="map" role="application" aria-label="Mapa Leaflet de atención a clientes"></div>
 <div class="legend" id="legend"></div>
+
 <script>
 (function(){
   const CSV_URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
@@ -182,7 +184,7 @@
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
   const partColors = { "A":"#5a76ff", "B":"#30c48d", "C":"#a56cff" };
-  const partFill = { "A":"#5a76ff", "B":"#30c48d", "C":"#a56cff" };
+  const partFill   = { "A":"#5a76ff", "B":"#30c48d", "C":"#a56cff" };
 
   // ====== UI State ======
   let viewMode = "Actual";
@@ -194,14 +196,18 @@
 
   // ====== Map & panes ======
   const map = L.map('map', { preferCanvas:true, zoomControl:false });
-  // Zoom abajo-derecha
   L.control.zoom({ position: 'bottomright' }).addTo(map);
-  map.createPane('zonesPane'); map.getPane('zonesPane').style.zIndex = 300;
-  map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600;
+
+  map.createPane('zonesPane');
+  map.getPane('zonesPane').style.zIndex = 550; // [AJUSTE] elevar (debajo de markers 600, encima del tile)
+  map.createPane('markersPane');
+  map.getPane('markersPane').style.zIndex = 600;
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
-  const currentLayer = L.layerGroup().addTo(map);
-  const proposedLayer = L.layerGroup();
-  const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
+
+  const currentLayer   = L.layerGroup().addTo(map);
+  const proposedLayer  = L.layerGroup();
+  const boundaryLayer  = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
   const districtsLayerHolder = L.layerGroup().addTo(map);
 
   // ====== Data ======
@@ -247,10 +253,7 @@
     if (!areaFeatures) return null;
     const pt = turf.point([lon, lat]);
     const feats = areaFeatures.features || [];
-    for (let i=0; i<feats.length; i++){
-      const f=feats[i];
-      if (turf.booleanPointInPolygon(pt, f)) return { idx:i, name:getFeatureDistName(f) };
-    }
+    for (let i=0; i<feats.length; i++){ const f=feats[i]; if (turf.booleanPointInPolygon(pt, f)) return { idx:i, name:getFeatureDistName(f) }; }
     return null;
   }
   const baseColors = ["#22c55e","#eab308","#06b6d4","#f97316","#a855f7","#ef4444","#14b8a6","#f43f5e","#84cc16","#e879f9","#60a5fa","#f59e0b","#10b981","#8b5cf6"];
@@ -350,21 +353,20 @@
         if (!validOffice(normalize(r.office))) continue;
         if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
 
-        // Con Día = "Todos" NO filtramos por día
         let dayPass = true;
         if (selectedDay !== "Todos"){
           dayPass = (viewMode === "Actual") ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay));
         }
         if (!dayPass) continue;
 
-        // +Z3 aplica en ambas vistas: si está ON, sólo quienes tenían >2 días actuales
         if (filterZ3 && !r.hadZ3) continue;
 
         const color = colorForChannel(r.canal || "");
         const marker = L.circleMarker([r.lat, r.lon], {
           pane:'markersPane',
           radius:5.6, stroke:true, weight:1, color:"#0b1221",
-          fillColor: color, fillOpacity:0.95
+          fillColor: color, fillOpacity:0.95,
+          bubblingMouseEvents: true // [AJUSTE] dejamos burbujeo para el atajo de clic derecho global
         }).bindPopup(buildPopUp(r));
 
         (viewMode === "Actual" ? currentLayer : proposedLayer).addLayer(marker);
@@ -457,20 +459,23 @@
 
     const layer = L.geoJSON(areaFeatures, {
       pane:'zonesPane',
+      interactive: true,                         // [NUEVO] asegurar interactividad
       style: (feature) => {
         const idx = feature.properties.__idx;
         const part = featurePartByIdx.get(idx);
         if (part){
-          return { color: partColors[part], weight: 1.1, fillColor: partFill[part], fillOpacity: 0.18 };
+          return { color: partColors[part], weight: 1.2, fillColor: partFill[part], fillOpacity: 0.25 }; // [AJUSTE]
         }
-        return { color:'#ef4444', weight:1, fillOpacity:0 };
+        return { color:'#ef4444', weight:1, fillOpacity:0.05 }; // [AJUSTE]
       },
       onEachFeature: (feature, polygonLayer) => {
         const name = getFeatureDistName(feature);
+
         // Tooltip de distrito (hover)
         polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false});
-        // Popup resumen (click)
-        polygonLayer.on('click', (e) => {
+
+        // Popup resumen (click) — usar bindPopup para asegurar el lifecycle del popup en la capa
+        polygonLayer.on('click', (e) => {                                         // [AJUSTE]
           const idx = feature.properties.__idx;
           const resume = summarizeDistrict(idx);
           const html = `
@@ -480,7 +485,7 @@
               <div>Por parte → A: <strong>${resume.A}</strong> · B: <strong>${resume.B}</strong> · C: <strong>${resume.C}</strong></div>
             </div>
           `;
-          L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+          polygonLayer.bindPopup(html).openPopup(e.latlng);                       // [NUEVO]
         });
       }
     });
@@ -677,6 +682,25 @@
   document.getElementById('oficChorri').addEventListener('change', (e)=>{ if (e.target.checked) filterOffices.add("OFIC CHORRILLOS"); else filterOffices.delete("OFIC CHORRILLOS"); renderLegend(); refreshLayers(); });
   document.getElementById('markersToggle').addEventListener('change', (e)=>{ showMarkers = e.target.checked; renderLegend(); refreshLayers(); });
   document.getElementById('z3Toggle').addEventListener('change', (e)=>{ filterZ3 = e.target.checked; renderLegend(); refreshLayers(); });
+
+  // ====== Atajo universal: clic derecho para ver el distrito bajo el cursor ======  // [NUEVO]
+  map.on('contextmenu', (e) => {
+    if (!areaFeatures) return;
+    const lat = e.latlng.lat, lon = e.latlng.lng;
+    const found = getContainingFeature(lat, lon);
+    if (!found) return;
+    const name = found.name;
+    const resume = summarizeDistrict(found.idx);
+    const html = `
+      <div style="min-width:220px">
+        <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(name)}</div>
+        <div>Total clientes (visibles): <strong>${resume.total}</strong></div>
+        <div>Por parte → A: <strong>${resume.A}</strong> · B: <strong>${resume.B}</strong> · C: <strong>${resume.C}</strong></div>
+        <div style="margin-top:6px; color:#9fb0c3">Clic derecho = popup de distrito</div>
+      </div>
+    `;
+    L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+  });
 
   // ====== Load GeoJSON + CSV ======
   fetch(GEOJSON_URL)
