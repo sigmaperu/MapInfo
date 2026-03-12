@@ -14,74 +14,74 @@
 <style>
  /* ===== Material Design (dark) tokens (compact) ===== */
  :root{
-  --md-bg:#0b0f14;
-  --md-surface:#0f1520;
-  --md-surface-2:#121a26;
-  --md-outline:#243245;
-  --md-text:#e6edf3;
-  --md-muted:#9fb0c3;
-  --md-primary:#7c4dff; /* Primary */
-  --md-secondary:#03dac6; /* Secondary */
-  --chip-bg:#0d1522;
-  --elev: 0 2px 10px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+ --md-bg:#0b0f14;
+ --md-surface:#0f1520;
+ --md-surface-2:#121a26;
+ --md-outline:#243245;
+ --md-text:#e6edf3;
+ --md-muted:#9fb0c3;
+ --md-primary:#7c4dff; /* Primary */
+ --md-secondary:#03dac6; /* Secondary */
+ --chip-bg:#0d1522;
+ --elev: 0 2px 10px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
  }
  *{ box-sizing:border-box }
  body{
-  margin:0; font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  background:var(--md-bg); color:var(--md-text);
+ margin:0; font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+ background:var(--md-bg); color:var(--md-text);
  }
  header{
-  position:sticky; top:0; z-index:1000;
-  padding:8px 10px; border-bottom:1px solid var(--md-outline);
-  display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-  background:linear-gradient(180deg, #0b0f14 0%, #0f1520 100%); box-shadow:var(--elev);
+ position:sticky; top:0; z-index:1000;
+ padding:8px 10px; border-bottom:1px solid var(--md-outline);
+ display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+ background:linear-gradient(180deg, #0b0f14 0%, #0f1520 100%); box-shadow:var(--elev);
  }
  h1{ font-size:15px; margin:0; letter-spacing:.2px; font-weight:700; }
  .muted{ color:var(--md-muted); font-size:11px; }
  .controls{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
  .group{
-  display:flex; gap:6px; align-items:center; padding:6px 8px;
-  background:var(--md-surface-2); border:1px solid var(--md-outline); border-radius:10px;
+ display:flex; gap:6px; align-items:center; padding:6px 8px;
+ background:var(--md-surface-2); border:1px solid var(--md-outline); border-radius:10px;
  }
  .segmented{
-  display:flex; overflow:hidden; border-radius:9px; border:1px solid var(--md-outline); background:var(--chip-bg);
+ display:flex; overflow:hidden; border-radius:9px; border:1px solid var(--md-outline); background:var(--chip-bg);
  }
  .segmented button{
-  background:transparent; color:var(--md-text); border:0; padding:5px 8px; cursor:pointer; font-weight:600; font-size:12px;
+ background:transparent; color:var(--md-text); border:0; padding:5px 8px; cursor:pointer; font-weight:600; font-size:12px;
  }
  .segmented button.active{ background:var(--md-primary); color:#0a0716; }
  .segmented button + button{ border-left:1px solid var(--md-outline); }
  label.switch{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none; font-weight:600; font-size:12px;}
  .toggle{
-  width:44px; height:24px; background:#0b1320; border:1px solid var(--md-outline); border-radius:999px; position:relative; transition:.2s;
+ width:44px; height:24px; background:#0b1320; border:1px solid var(--md-outline); border-radius:999px; position:relative; transition:.2s;
  }
- .knob{ width:20px; height:20px; background:#fff; border-radius:50%; position:absolute; top:1.5px; left:1.5px; transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,.5);} 
+ .knob{ width:20px; height:20px; background:#fff; border-radius:50%; position:absolute; top:1.5px; left:1.5px; transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,.5);}
  input[type="checkbox"].toggle-input{ display:none; }
  input[type="checkbox"].toggle-input:checked + .toggle{ background:var(--md-secondary); }
  input[type="checkbox"].toggle-input:checked + .toggle .knob{ left:22px; }
  .select{
-  appearance:none; background:#0b1320; border:1px solid var(--md-outline); color:var(--md-text); padding:6px 8px; border-radius:9px;
-  font-weight:600; font-size:12px;
+ appearance:none; background:#0b1320; border:1px solid var(--md-outline); color:var(--md-text); padding:6px 8px; border-radius:9px;
+ font-weight:600; font-size:12px;
  }
  .btn{
-  padding:6px 10px; border:1px solid var(--md-outline); background:#1a2030;
-  color:#dcd3ff; border-radius:9px; cursor:pointer; font-weight:700; letter-spacing:.3px; font-size:12px;
+ padding:6px 10px; border:1px solid var(--md-outline); background:#1a2030;
+ color:#dcd3ff; border-radius:9px; cursor:pointer; font-weight:700; letter-spacing:.3px; font-size:12px;
  }
  .btn:hover{ filter:brightness(1.12); }
  #map{ height: calc(100vh - 86px); }
  .legend{
-  position:absolute; bottom:12px; left:12px; z-index:600; background:var(--md-surface);
-  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width: 380px; box-shadow:var(--elev);
+ position:absolute; bottom:12px; left:12px; z-index:600; background:var(--md-surface);
+ border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width: 380px; box-shadow:var(--elev);
  }
  .legend h4{ margin:0 0 6px 0; font-size:12px; }
  .legend .row{ display:flex; align-items:center; gap:6px; margin:4px 0; flex-wrap:wrap;}
  .swatch{ width:12px; height:12px; border-radius:2px; border:1px solid #0003; }
- .pill{ font-size:10px; padding:2px 6px; border:1px solid var(--md-outline); border-radius:999px; color:var(--md-muted); background:var(--chip-bg);} 
+ .pill{ font-size:10px; padding:2px 6px; border:1px solid var(--md-outline); border-radius:999px; color:var(--md-muted); background:var(--chip-bg);}
  a, a:visited{ color:#93c5fd; text-decoration:none; }
  a:hover{ text-decoration:underline; }
  .freq{
-  display:inline-block; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-weight:800; font-size:12px; background:#0b1221; color:#c7d2fe; padding:2px 6px; border-radius:6px; border:1px solid #111827; 
+ display:inline-block; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+ font-weight:800; font-size:12px; background:#0b1221; color:#c7d2fe; padding:2px 6px; border-radius:6px; border:1px solid #111827;
  }
  .popup-line{ margin:3px 0; }
  .popup-muted{ color:#9CA3AF; }
@@ -160,6 +160,7 @@
 (function(){
   const CSV_URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
   const GEOJSON_URL = "https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson";
+
   // ====== Config ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   const EXCLUDE_DISTRICTS = new Set([
@@ -168,11 +169,13 @@
   const EXCLUDE_CODES = new Set(["11747415","11604173","11747406","11684549"]);
   const EXCLUDE_INTERLOC = "211087"; // col[26]
   const PROPUESTA_BAJA_VAL = "PROPUESTA BAJA"; // col[55], comparación normalizada
+
   // MOD permitido salvo estos nombres
   const MOD_EXCLUDE_KEYWORDS = [
     "Plaza vea","SPSA Makro","Economax","Supermercados Peruanos","Mayorsa",
     "Metro","Cencosud","Tottus","CD Huachipa","Comidas gourmet","Delivery Hero","Ajiles","Solana"
   ].map(s => normalize(s));
+
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
   const dayNameToLetter = { "Lunes":"L", "Martes":"M", "Miércoles":"X", "Jueves":"J", "Viernes":"V", "Sábado":"S" };
   const orderDays = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -232,6 +235,7 @@
     return ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"]
       .map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
   }
+
   const DIST_KEYS = ["NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist","nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"];
   function getFeatureDistName(f){
     const p = f?.properties || {};
@@ -243,7 +247,10 @@
     if (!areaFeatures) return null;
     const pt = turf.point([lon, lat]);
     const feats = areaFeatures.features || [];
-    for (let i=0; i<feats.length; i++){ const f=feats[i]; if (turf.booleanPointInPolygon(pt, f)) return { idx:i, name:getFeatureDistName(f) }; }
+    for (let i=0; i<feats.length; i++){
+      const f=feats[i];
+      if (turf.booleanPointInPolygon(pt, f)) return { idx:i, name:getFeatureDistName(f) };
+    }
     return null;
   }
   const baseColors = ["#22c55e","#eab308","#06b6d4","#f97316","#a855f7","#ef4444","#14b8a6","#f43f5e","#84cc16","#e879f9","#60a5fa","#f59e0b","#10b981","#8b5cf6"];
@@ -257,10 +264,10 @@
   function escapeHtml(str) {
     return (str ?? "").toString()
       .replace(/&/g, "&amp;")
-      .replace(/</g,  "&lt;")
-      .replace(/>/g,  "&gt;")
-      .replace(/"/g,  "&quot;")
-      .replace(/'/g,  "&#39;");
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   // ====== Legend ======
@@ -286,7 +293,6 @@
       <div class="row">L: <span class="pill">${dayCounts.L}</span> M: <span class="pill">${dayCounts.M}</span> X: <span class="pill">${dayCounts.X}</span> J: <span class="pill">${dayCounts.J}</span> V: <span class="pill">${dayCounts.V}</span> S: <span class="pill">${dayCounts.S}</span></div>
     `;
   }
-
   function fitToContent(){
     let bounds = null;
     const layers = [];
@@ -301,7 +307,6 @@
     if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.08));
     else map.setView([-12.0464, -77.0428], 10);
   }
-
   function buildPopUp(r){
     const gm = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
     const proposedDaysStr = (r.proposedDays && r.proposedDays.length) ? r.proposedDays.join(", ") : "—";
@@ -344,12 +349,14 @@
       for (const r of records){
         if (!validOffice(normalize(r.office))) continue;
         if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+
         // Con Día = "Todos" NO filtramos por día
         let dayPass = true;
         if (selectedDay !== "Todos"){
           dayPass = (viewMode === "Actual") ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay));
         }
         if (!dayPass) continue;
+
         // +Z3 aplica en ambas vistas: si está ON, sólo quienes tenían >2 días actuales
         if (filterZ3 && !r.hadZ3) continue;
 
@@ -359,6 +366,7 @@
           radius:5.6, stroke:true, weight:1, color:"#0b1221",
           fillColor: color, fillOpacity:0.95
         }).bindPopup(buildPopUp(r));
+
         (viewMode === "Actual" ? currentLayer : proposedLayer).addLayer(marker);
       }
     }
@@ -378,6 +386,7 @@
 
   // ====== Resúmenes ======
   function passesZ3(r){ return !(filterZ3 && !r.hadZ3); }
+
   function countByChannelWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -398,6 +407,7 @@
     }
     return counts;
   }
+
   function countByPartWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -417,6 +427,7 @@
     }
     return counts;
   }
+
   function countByDayWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -443,6 +454,7 @@
     districtsLayerHolder.clearLayers();
     if (!areaFeatures) return;
     areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
+
     const layer = L.geoJSON(areaFeatures, {
       pane:'zonesPane',
       style: (feature) => {
@@ -455,7 +467,7 @@
       },
       onEachFeature: (feature, polygonLayer) => {
         const name = getFeatureDistName(feature);
-        // Tooltip de distrito (hover) — aseguramos que se cree siempre
+        // Tooltip de distrito (hover)
         polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false});
         // Popup resumen (click)
         polygonLayer.on('click', (e) => {
@@ -474,6 +486,7 @@
     });
     layer.addTo(districtsLayerHolder);
   }
+
   function summarizeDistrict(featIdx){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -531,27 +544,35 @@
     const prelim = [];
     for (let i=startIdx; i<rows.length; i++){
       const row = rows[i]; if (!row) continue;
+
       const code = (row[0] ?? "").toString().trim();
       if (EXCLUDE_CODES.has(code)) continue;
+
       const route = (row[12] ?? "").toString().trim(); // Ruta
-      const name = (row[7] ?? "").toString().trim();
+      const name  = (row[7]  ?? "").toString().trim();
       const canal = (row[21] ?? "").toString().trim();
       const interloc = (row[26] ?? "").toString().trim();
+
       const lat = num(row[28]), lon = num(row[29]);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+
       const office = (row[46] ?? "").toString().trim();
       const officeNorm = normalize(office);
       if (!OFFICES.has(officeNorm)) continue;
+
       const container = getContainingFeature(lat, lon);
       if (!container) continue;
       const geoDistName = container.name;
       const geoDistNorm = normalize(geoDistName);
       if (EXCLUDE_DISTRICTS.has(geoDistNorm)) continue;
+
       // col[55]: Propuesta baja -> excluir
       const propuestaFlag = (row[55] ?? "").toString().trim();
       if (normalize(propuestaFlag) === PROPUESTA_BAJA_VAL) continue;
+
       // interlocutor excluido
       if (interloc === EXCLUDE_INTERLOC) continue;
+
       // MOD permitido salvo keywords en nombre
       const canalNorm = normalize(canal);
       const nameNorm = normalizeName(name);
@@ -559,10 +580,12 @@
         const hit = MOD_EXCLUDE_KEYWORDS.some(k => nameNorm.includes(k));
         if (hit) continue;
       }
+
       const csvDistrito = (row[17] ?? "").toString().trim();
       const daysRaw = (row[48] ?? "").toString().trim();
       const days = parseDays(daysRaw);
       const freqLetters = toFreqLetters(days);
+
       prelim.push({
         code, name, canal, canalNorm, distrito: csvDistrito, office, route,
         daysRaw, days, freqLetters, lat, lon,
@@ -570,6 +593,7 @@
         hadZ3: days.length > 2 // << marcador Z3
       });
     }
+
     // Deduplicación Nombre+Lat/Lon
     const seen = new Set(); const deduped = [];
     for (const r of prelim){
@@ -577,10 +601,13 @@
       if (seen.has(key)) continue; seen.add(key); deduped.push(r);
     }
     records = deduped;
+
     // Filtro de canales (Todos + encontrados)
     populateCanalFilter(records.map(r=>r.canal).filter(Boolean));
+
     // Particionar y snap
     assignBalancedPartsAndSnapToDistricts();
+
     // Render
     refreshLayers();
   }
@@ -603,12 +630,14 @@
       r.proposedLetters || "", r.canal || "", r.route || "",
       r.lat, r.lon, r.office || ""
     ].map(v => csvEscape(v)).join(","))).join("\r\n");
+
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = "ATEII_export.csv"; a.click();
     URL.revokeObjectURL(url);
   });
+
   function getFilteredRowsForExport(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -628,6 +657,7 @@
     }
     return out;
   }
+
   function csvEscape(v){
     const s = (v ?? "").toString();
     if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
