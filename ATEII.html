@@ -14,64 +14,64 @@
 <style>
  /* ===== Material Design (dark) tokens (compact) ===== */
  :root{
- --md-bg:#0b0f14;
- --md-surface:#0f1520;
- --md-surface-2:#121a26;
- --md-outline:#243245;
- --md-text:#e6edf3;
- --md-muted:#9fb0c3;
- --md-primary:#7c4dff; /* Primary */
- --md-secondary:#03dac6; /* Secondary */
- --chip-bg:#0d1522;
- --elev: 0 2px 10px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+  --md-bg:#0b0f14;
+  --md-surface:#0f1520;
+  --md-surface-2:#121a26;
+  --md-outline:#243245;
+  --md-text:#e6edf3;
+  --md-muted:#9fb0c3;
+  --md-primary:#7c4dff; /* Primary */
+  --md-secondary:#03dac6; /* Secondary */
+  --chip-bg:#0d1522;
+  --elev: 0 2px 10px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
  }
  *{ box-sizing:border-box }
  body{
- margin:0; font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
- background:var(--md-bg); color:var(--md-text);
+  margin:0; font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background:var(--md-bg); color:var(--md-text);
  }
  header{
- position:sticky; top:0; z-index:1000;
- padding:8px 10px; border-bottom:1px solid var(--md-outline);
- display:flex; gap:10px; align-items:center; flex-wrap:wrap;
- background:linear-gradient(180deg, #0b0f14 0%, #0f1520 100%); box-shadow:var(--elev);
+  position:sticky; top:0; z-index:1000;
+  padding:8px 10px; border-bottom:1px solid var(--md-outline);
+  display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  background:linear-gradient(180deg, #0b0f14 0%, #0f1520 100%); box-shadow:var(--elev);
  }
  h1{ font-size:15px; margin:0; letter-spacing:.2px; font-weight:700; }
  .muted{ color:var(--md-muted); font-size:11px; }
  .controls{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
  .group{
- display:flex; gap:6px; align-items:center; padding:6px 8px;
- background:var(--md-surface-2); border:1px solid var(--md-outline); border-radius:10px;
+  display:flex; gap:6px; align-items:center; padding:6px 8px;
+  background:var(--md-surface-2); border:1px solid var(--md-outline); border-radius:10px;
  }
  .segmented{
- display:flex; overflow:hidden; border-radius:9px; border:1px solid var(--md-outline); background:var(--chip-bg);
+  display:flex; overflow:hidden; border-radius:9px; border:1px solid var(--md-outline); background:var(--chip-bg);
  }
  .segmented button{
- background:transparent; color:var(--md-text); border:0; padding:5px 8px; cursor:pointer; font-weight:600; font-size:12px;
+  background:transparent; color:var(--md-text); border:0; padding:5px 8px; cursor:pointer; font-weight:600; font-size:12px;
  }
  .segmented button.active{ background:var(--md-primary); color:#0a0716; }
  .segmented button + button{ border-left:1px solid var(--md-outline); }
  label.switch{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none; font-weight:600; font-size:12px;}
  .toggle{
- width:44px; height:24px; background:#0b1320; border:1px solid var(--md-outline); border-radius:999px; position:relative; transition:.2s;
+  width:44px; height:24px; background:#0b1320; border:1px solid var(--md-outline); border-radius:999px; position:relative; transition:.2s;
  }
  .knob{ width:20px; height:20px; background:#fff; border-radius:50%; position:absolute; top:1.5px; left:1.5px; transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,.5);}
  input[type="checkbox"].toggle-input{ display:none; }
  input[type="checkbox"].toggle-input:checked + .toggle{ background:var(--md-secondary); }
  input[type="checkbox"].toggle-input:checked + .toggle .knob{ left:22px; }
  .select{
- appearance:none; background:#0b1320; border:1px solid var(--md-outline); color:var(--md-text); padding:6px 8px; border-radius:9px;
- font-weight:600; font-size:12px;
+  appearance:none; background:#0b1320; border:1px solid var(--md-outline); color:var(--md-text); padding:6px 8px; border-radius:9px;
+  font-weight:600; font-size:12px;
  }
  .btn{
- padding:6px 10px; border:1px solid var(--md-outline); background:#1a2030;
- color:#dcd3ff; border-radius:9px; cursor:pointer; font-weight:700; letter-spacing:.3px; font-size:12px;
+  padding:6px 10px; border:1px solid var(--md-outline); background:#1a2030;
+  color:#dcd3ff; border-radius:9px; cursor:pointer; font-weight:700; letter-spacing:.3px; font-size:12px;
  }
  .btn:hover{ filter:brightness(1.12); }
  #map{ height: calc(100vh - 86px); }
  .legend{
- position:absolute; bottom:12px; left:12px; z-index:600; background:var(--md-surface);
- border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width: 380px; box-shadow:var(--elev);
+  position:absolute; bottom:12px; left:12px; z-index:600; background:var(--md-surface);
+  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width: 380px; box-shadow:var(--elev);
  }
  .legend h4{ margin:0 0 6px 0; font-size:12px; }
  .legend .row{ display:flex; align-items:center; gap:6px; margin:4px 0; flex-wrap:wrap;}
@@ -80,14 +80,17 @@
  a, a:visited{ color:#93c5fd; text-decoration:none; }
  a:hover{ text-decoration:underline; }
  .freq{
- display:inline-block; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
- font-weight:800; font-size:12px; background:#0b1221; color:#c7d2fe; padding:2px 6px; border-radius:6px; border:1px solid #111827;
+  display:inline-block; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-weight:800; font-size:12px; background:#0b1221; color:#c7d2fe; padding:2px 6px; border-radius:6px; border:1px solid #111827;
  }
  .popup-line{ margin:3px 0; }
  .popup-muted{ color:#9CA3AF; }
  .leaflet-tooltip { background:#101826; color:#dbe7f3; border:1px solid #223144; border-radius:10px; box-shadow:var(--elev); }
  /* mover zoom a esquina inferior derecha (si el control está activo) */
  .leaflet-control-container .leaflet-bottom.leaflet-right { right: 16px; bottom: 16px; }
+
+ /* Mejor señal visual de interactividad */
+ .leaflet-pane .leaflet-interactive { cursor: pointer; } /* asegura cursor en shapes */
 </style>
 </head>
 <body>
@@ -140,7 +143,7 @@
         <span class="toggle"><span class="knob"></span></span>
       </label>
     </div>
-    <!-- +Z3: solo clientes que tenían >2 días (aplica en Actual y Propuesta) -->
+    <!-- +Z3 -->
     <div class="group" title="Mostrar solo clientes que tenían más de 2 días actuales (Actual y Propuesta)">
       <label class="switch">
         <span>+Z3</span>
@@ -172,7 +175,6 @@
   const EXCLUDE_INTERLOC = "211087"; // col[26]
   const PROPUESTA_BAJA_VAL = "PROPUESTA BAJA"; // col[55], comparación normalizada
 
-  // MOD permitido salvo estos nombres
   const MOD_EXCLUDE_KEYWORDS = [
     "Plaza vea","SPSA Makro","Economax","Supermercados Peruanos","Mayorsa",
     "Metro","Cencosud","Tottus","CD Huachipa","Comidas gourmet","Delivery Hero","Ajiles","Solana"
@@ -184,7 +186,7 @@
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
   const partColors = { "A":"#5a76ff", "B":"#30c48d", "C":"#a56cff" };
-  const partFill   = { "A":"#5a76ff", "B":"#30c48d", "C":"#a56cff" };
+  const partFill   = { "A":"rgba(90,118,255,0.25)", "B":"rgba(48,196,141,0.25)", "C":"rgba(165,108,255,0.25)" };
 
   // ====== UI State ======
   let viewMode = "Actual";
@@ -192,14 +194,15 @@
   let selectedCanal = "Todos";
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   let showMarkers = true;
-  let filterZ3 = false; // << ahora aplica en Actual y Propuesta
+  let filterZ3 = false;
 
   // ====== Map & panes ======
   const map = L.map('map', { preferCanvas:true, zoomControl:false });
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+  // Panes: aseguramos distritos por encima de markers para que reciban eventos
   map.createPane('zonesPane');
-  map.getPane('zonesPane').style.zIndex = 550; // [AJUSTE] elevar (debajo de markers 600, encima del tile)
+  map.getPane('zonesPane').style.zIndex = 650; // encima de markers (600)
   map.createPane('markersPane');
   map.getPane('markersPane').style.zIndex = 600;
 
@@ -212,7 +215,7 @@
 
   // ====== Data ======
   let areaFeatures = null;
-  let records = []; // {code,name,canal,canalNorm,distrito,office,route,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters, hadZ3:boolean}
+  let records = []; // { ... , featIdx, geoDistName, ...}
   let featurePartByIdx = new Map();
   let channelPalette = {};
 
@@ -238,8 +241,7 @@
     return orderDays.filter(d => set.has(d));
   }
   function toFreqLetters(dayArr){
-    return ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"]
-      .map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
+    return ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"].map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
   }
 
   const DIST_KEYS = ["NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist","nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"];
@@ -266,11 +268,8 @@
   }
   function escapeHtml(str) {
     return (str ?? "").toString()
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
   // ====== Legend ======
@@ -365,8 +364,7 @@
         const marker = L.circleMarker([r.lat, r.lon], {
           pane:'markersPane',
           radius:5.6, stroke:true, weight:1, color:"#0b1221",
-          fillColor: color, fillOpacity:0.95,
-          bubblingMouseEvents: true // [AJUSTE] dejamos burbujeo para el atajo de clic derecho global
+          fillColor: color, fillOpacity:0.95
         }).bindPopup(buildPopUp(r));
 
         (viewMode === "Actual" ? currentLayer : proposedLayer).addLayer(marker);
@@ -388,7 +386,6 @@
 
   // ====== Resúmenes ======
   function passesZ3(r){ return !(filterZ3 && !r.hadZ3); }
-
   function countByChannelWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -409,7 +406,6 @@
     }
     return counts;
   }
-
   function countByPartWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -429,7 +425,6 @@
     }
     return counts;
   }
-
   function countByDayWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -459,23 +454,38 @@
 
     const layer = L.geoJSON(areaFeatures, {
       pane:'zonesPane',
-      interactive: true,                         // [NUEVO] asegurar interactividad
+      interactive: true,                // ← asegura eventos
+      bubblingMouseEvents: false,       // ← el polígono maneja el click
       style: (feature) => {
         const idx = feature.properties.__idx;
         const part = featurePartByIdx.get(idx);
         if (part){
-          return { color: partColors[part], weight: 1.2, fillColor: partFill[part], fillOpacity: 0.25 }; // [AJUSTE]
+          return { color: partColors[part], weight: 1.6, fillColor: partFill[part], fillOpacity: 0.25 };
         }
-        return { color:'#ef4444', weight:1, fillOpacity:0.05 }; // [AJUSTE]
+        return { color:'#8b5cf6', weight:1.6, fillOpacity:0.12 };
       },
       onEachFeature: (feature, polygonLayer) => {
         const name = getFeatureDistName(feature);
 
-        // Tooltip de distrito (hover)
-        polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false});
+        // Señal de hover (mejora puntería en Canvas)
+        polygonLayer.on('mouseover', function(){
+          this.setStyle({ weight: 3 });
+          if (this.bringToFront) this.bringToFront();
+        });
+        polygonLayer.on('mouseout', function(){
+          const idx = feature.properties.__idx;
+          const part = featurePartByIdx.get(idx);
+          const style = part
+            ? { color: partColors[part], weight: 1.6, fillColor: partFill[part], fillOpacity: 0.25 }
+            : { color:'#8b5cf6', weight:1.6, fillOpacity:0.12 };
+          this.setStyle(style);
+        });
 
-        // Popup resumen (click) — usar bindPopup para asegurar el lifecycle del popup en la capa
-        polygonLayer.on('click', (e) => {                                         // [AJUSTE]
+        // Tooltip (hover)
+        polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip'});
+
+        // Popup resumen (click)
+        polygonLayer.on('click', (e) => {
           const idx = feature.properties.__idx;
           const resume = summarizeDistrict(idx);
           const html = `
@@ -485,7 +495,7 @@
               <div>Por parte → A: <strong>${resume.A}</strong> · B: <strong>${resume.B}</strong> · C: <strong>${resume.C}</strong></div>
             </div>
           `;
-          polygonLayer.bindPopup(html).openPopup(e.latlng);                       // [NUEVO]
+          polygonLayer.bindPopup(html).openPopup(e.latlng);
         });
       }
     });
@@ -571,14 +581,11 @@
       const geoDistNorm = normalize(geoDistName);
       if (EXCLUDE_DISTRICTS.has(geoDistNorm)) continue;
 
-      // col[55]: Propuesta baja -> excluir
       const propuestaFlag = (row[55] ?? "").toString().trim();
       if (normalize(propuestaFlag) === PROPUESTA_BAJA_VAL) continue;
 
-      // interlocutor excluido
       if (interloc === EXCLUDE_INTERLOC) continue;
 
-      // MOD permitido salvo keywords en nombre
       const canalNorm = normalize(canal);
       const nameNorm = normalizeName(name);
       if (canalNorm === "MOD"){
@@ -595,7 +602,7 @@
         code, name, canal, canalNorm, distrito: csvDistrito, office, route,
         daysRaw, days, freqLetters, lat, lon,
         featIdx: container.idx, geoDistName,
-        hadZ3: days.length > 2 // << marcador Z3
+        hadZ3: days.length > 2
       });
     }
 
@@ -607,13 +614,8 @@
     }
     records = deduped;
 
-    // Filtro de canales (Todos + encontrados)
     populateCanalFilter(records.map(r=>r.canal).filter(Boolean));
-
-    // Particionar y snap
     assignBalancedPartsAndSnapToDistricts();
-
-    // Render
     refreshLayers();
   }
 
@@ -683,7 +685,7 @@
   document.getElementById('markersToggle').addEventListener('change', (e)=>{ showMarkers = e.target.checked; renderLegend(); refreshLayers(); });
   document.getElementById('z3Toggle').addEventListener('change', (e)=>{ filterZ3 = e.target.checked; renderLegend(); refreshLayers(); });
 
-  // ====== Atajo universal: clic derecho para ver el distrito bajo el cursor ======  // [NUEVO]
+  // ====== Atajo opcional: clic derecho = popup de distrito bajo el cursor
   map.on('contextmenu', (e) => {
     if (!areaFeatures) return;
     const lat = e.latlng.lat, lon = e.latlng.lng;
