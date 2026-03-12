@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ATEII – Atención actual vs propuesta</title>
-  
-  <!-- Leaflet CSS & JS (asegura que L esté definido antes de usarlo) -->
+
+  <!-- Leaflet CSS & JS (asegura que L esté definido) -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -16,7 +16,7 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin="">
   </script>
-  
+
   <!-- PapaParse (CSV) -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <!-- Turf.js (geo utilidades) -->
@@ -188,28 +188,11 @@
       if (t28.includes("lat") || t29.includes("lon")) return true;
       return false;
     }
-    function parseDays(raw){
-      const s = (raw ?? "").toString().toUpperCase().replace(/[^LMXJVS]/g,"");
-      const set = new Set(); for (const ch of s) if (dayLetterToName[ch]) set.add(dayLetterToName[ch]);
-      return orderDays.filter(d => set.has(d));
-    }
-    function toFreqLetters(dayArr){
-      return ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"].map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
-    }
+    function parseDays(raw){ const s = (raw ?? "").toString().toUpperCase().replace(/[^LMXJVS]/g,""); const set = new Set(); for (const ch of s) if (dayLetterToName[ch]) set.add(dayLetterToName[ch]); return orderDays.filter(d => set.has(d)); }
+    function toFreqLetters(dayArr){ return ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"].map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join(""); }
     const DIST_KEYS = ["NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist","nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"];
-    function getFeatureDistName(f){
-      const p = f?.properties || {};
-      for (const k of DIST_KEYS){ if (p[k] && typeof p[k] === "string" && p[k].trim().length) return p[k].trim(); }
-      for (const k in p){ if (typeof p[k] === "string" && p[k].trim().length) return p[k].trim(); }
-      return "Distrito";
-    }
-    function getContainingFeature(lat, lon){
-      if (!areaFeatures) return null;
-      const pt = turf.point([lon, lat]);
-      const feats = areaFeatures.features || [];
-      for (let i=0; i<feats.length; i++){ const f=feats[i]; if (turf.booleanPointInPolygon(pt, f)) return { idx:i, name:getFeatureDistName(f) }; }
-      return null;
-    }
+    function getFeatureDistName(f){ const p = f?.properties || {}; for (const k of DIST_KEYS){ if (p[k] && typeof p[k] === "string" && p[k].trim().length) return p[k].trim(); } for (const k in p){ if (typeof p[k] === "string" && p[k].trim().length) return p[k].trim(); } return "Distrito"; }
+    function getContainingFeature(lat, lon){ if (!areaFeatures) return null; const pt = turf.point([lon, lat]); const feats = areaFeatures.features || []; for (let i=0; i<feats.length; i++){ const f=feats[i]; if (turf.booleanPointInPolygon(pt, f)) return { idx:i, name:getFeatureDistName(f) }; } return null; }
     const baseColors = ["#22c55e","#eab308","#06b6d4","#f97316","#a855f7","#ef4444","#14b8a6","#f43f5e","#84cc16","#e879f9","#60a5fa","#f59e0b","#10b981","#8b5cf6"];
     function colorForChannel(canal){ if (!canal) return "#6b7280"; if (channelPalette[canal]) return channelPalette[canal]; let h=0; for(let i=0;i<canal.length;i++) h=(h*31 + canal.charCodeAt(i))>>>0; const color = baseColors[h % baseColors.length]; channelPalette[canal] = color; return color; }
     function escapeHtml(str){ return (str ?? "").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
@@ -238,24 +221,9 @@
       `;
     }
 
-    function fitToContent(){
-      let bounds = null; const layers = [];
-      if (map.hasLayer(currentLayer)) layers.push(currentLayer);
-      if (map.hasLayer(proposedLayer)) layers.push(proposedLayer);
-      if (map.hasLayer(boundaryLayer)) layers.push(boundaryLayer);
-      if (map.hasLayer(districtsLayerHolder)) layers.push(districtsLayerHolder);
-      for (const l of layers){ const b = l.getBounds?.(); if (b && b.isValid()) bounds = bounds ? bounds.extend(b) : b; }
-      if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.08)); else map.setView([-12.0464, -77.0428], 10);
-    }
+    function fitToContent(){ let bounds = null; const layers = []; if (map.hasLayer(currentLayer)) layers.push(currentLayer); if (map.hasLayer(proposedLayer)) layers.push(proposedLayer); if (map.hasLayer(boundaryLayer)) layers.push(boundaryLayer); if (map.hasLayer(districtsLayerHolder)) layers.push(districtsLayerHolder); for (const l of layers){ const b = l.getBounds?.(); if (b && b.isValid()) bounds = bounds ? bounds.extend(b) : b; } if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.08)); else map.setView([-12.0464, -77.0428], 10); }
 
-    function buildPopUp(r){
-      const gm = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
-      const proposedDaysStr = (r.proposedDays && r.proposedDays.length) ? r.proposedDays.join(", ") : "—";
-      const partDays = r.part ? (partToDays[r.part]?.join(" & ")) : "—";
-      const distShown = r.geoDistName || r.distrito || "—";
-      const freqNow = r.freqLetters || "—";
-      const freqProp = r.proposedLetters || "—";
-      return `
+    function buildPopUp(r){ const gm = `https://www.google.com/maps?q=${r.lat},${r.lon}`; const proposedDaysStr = (r.proposedDays && r.proposedDays.length) ? r.proposedDays.join(", ") : "—"; const partDays = r.part ? (partToDays[r.part]?.join(" & ")) : "—"; const distShown = r.geoDistName || r.distrito || "—"; const freqNow = r.freqLetters || "—"; const freqProp = r.proposedLetters || "—"; return `
         <div style="min-width:260px; line-height:1.28;">
           <div class="popup-line" style="font-weight:700; font-size:14px;">Cliente: ${escapeHtml(r.code)}</div>
           <div class="popup-line"><strong>Nombre:</strong> ${escapeHtml(r.name || "")}</div>
@@ -270,157 +238,67 @@
           <div class="popup-line" style="margin-top:6px;">
             <a href="${gm}" target="_blank" rel="noopener noreferrer">Abrir en Google Maps ↗</a>
           </div>
-        </div>
-      `;
-    }
+        </div>`; }
 
     // ====== Distritos (tooltip fiable) ======
-    function renderDistrictsColoredByPart(){
-      districtsLayerHolder.clearLayers(); if (!areaFeatures) return;
-      areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
+    function renderDistrictsColoredByPart(){ districtsLayerHolder.clearLayers(); if (!areaFeatures) return; areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; }); const baseStyle = (part) => part ? { color: partColors[part], weight: 1.1, fillColor: partFill[part], fillOpacity: 0.18 } : { color:'#ef4444', weight:1, fillColor:'#000', fillOpacity:0.10 }; const highlightStyle = (part) => part ? { color: partColors[part], weight: 2.2, fillColor: partFill[part], fillOpacity: 0.32 } : { color:'#ef4444', weight:2.2, fillColor:'#000', fillOpacity:0.22 }; const layer = L.geoJSON(areaFeatures, { pane:'zonesPane', style: (feature) => { const idx = feature.properties.__idx; const part = featurePartByIdx.get(idx); return baseStyle(part); }, onEachFeature: (feature, polygonLayer) => { polygonLayer.options.interactive = true; const name = getFeatureDistName(feature); polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false}); polygonLayer.on('mouseover', (e) => { const idx = feature.properties.__idx; const part = featurePartByIdx.get(idx); polygonLayer.setStyle(highlightStyle(part)); polygonLayer.openTooltip(e.latlng); }); polygonLayer.on('mouseout', () => { const idx = feature.properties.__idx; const part = featurePartByIdx.get(idx); polygonLayer.setStyle(baseStyle(part)); }); polygonLayer.on('click', (e) => { const idx = feature.properties.__idx; const resume = summarizeDistrict(idx); const html = `<div style="min-width:220px"><div style="font-weight:700; margin-bottom:6px;">${escapeHtml(name)}</div><div>Total clientes (visibles): <strong>${resume.total}</strong></div><div>Por parte → A: <strong>${resume.A}</strong> · B: <strong>${resume.B}</strong> · C: <strong>${resume.C}</strong></div></div>`; L.popup().setLatLng(e.latlng).setContent(html).openOn(map); }); } }); layer.addTo(districtsLayerHolder); }
 
-      const baseStyle = (part) => part
-        ? { color: partColors[part], weight: 1.1, fillColor: partFill[part], fillOpacity: 0.18 }
-        : { color:'#ef4444', weight:1, fillColor:'#000', fillOpacity:0.10 };
-      const highlightStyle = (part) => part
-        ? { color: partColors[part], weight: 2.2, fillColor: partFill[part], fillOpacity: 0.32 }
-        : { color:'#ef4444', weight:2.2, fillColor:'#000', fillOpacity:0.22 };
+    // ====== Rendering (MARCADORES) ======
+    function refreshLayers(){
+      currentLayer.clearLayers();
+      proposedLayer.clearLayers();
 
-      const layer = L.geoJSON(areaFeatures, {
-        pane:'zonesPane',
-        style: (feature) => { const idx = feature.properties.__idx; const part = featurePartByIdx.get(idx); return baseStyle(part); },
-        onEachFeature: (feature, polygonLayer) => {
-          polygonLayer.options.interactive = true;
-          const name = getFeatureDistName(feature);
-          polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false});
-          polygonLayer.on('mouseover', (e) => { const idx = feature.properties.__idx; const part = featurePartByIdx.get(idx); polygonLayer.setStyle(highlightStyle(part)); polygonLayer.openTooltip(e.latlng); });
-          polygonLayer.on('mouseout', () => { const idx = feature.properties.__idx; const part = featurePartByIdx.get(idx); polygonLayer.setStyle(baseStyle(part)); });
-          polygonLayer.on('click', (e) => {
-            const idx = feature.properties.__idx; const resume = summarizeDistrict(idx);
-            const html = `
-              <div style="min-width:220px">
-                <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(name)}</div>
-                <div>Total clientes (visibles): <strong>${resume.total}</strong></div>
-                <div>Por parte → A: <strong>${resume.A}</strong> · B: <strong>${resume.B}</strong> · C: <strong>${resume.C}</strong></div>
-              </div>
-            `;
-            L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
-          });
+      const useAte = filterOffices.has("OFIC ATE");
+      const useChorri = filterOffices.has("OFIC CHORRILLOS");
+      const validOffice = (oNorm) => (
+        (oNorm === "OFIC ATE" && useAte) ||
+        (oNorm === "OFIC CHORRILLOS" && useChorri)
+      );
+
+      if (showMarkers){
+        for (const r of records){
+          if (!validOffice(normalize(r.office))) continue;
+          if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+          let dayPass = true;
+          if (selectedDay !== "Todos"){
+            dayPass = (viewMode === "Actual") ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay));
+          }
+          if (!dayPass) continue;
+          if (filterZ3 && !r.hadZ3) continue;
+
+          const color = colorForChannel(r.canal || "");
+          const marker = L.circleMarker([r.lat, r.lon], {
+            pane:'markersPane', radius:5.6, stroke:true, weight:1, color:"#0b1221",
+            fillColor: color, fillOpacity:0.95
+          }).bindPopup(buildPopUp(r));
+          (viewMode === "Actual" ? currentLayer : proposedLayer).addLayer(marker);
         }
-      });
-      layer.addTo(districtsLayerHolder);
+      }
+
+      if (viewMode === "Actual"){ if (!map.hasLayer(currentLayer)) currentLayer.addTo(map); if (map.hasLayer(proposedLayer)) map.removeLayer(proposedLayer); }
+      else { if (!map.hasLayer(proposedLayer)) proposedLayer.addTo(map); if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer); }
+
+      renderDistrictsColoredByPart();
+      renderLegend();
+      fitToContent();
     }
 
     // ====== Resúmenes ======
     function passesZ3(r){ return !(filterZ3 && !r.hadZ3); }
-    function countByChannelWithFilters(){
-      const useAte = filterOffices.has("OFIC ATE"); const useChorri = filterOffices.has("OFIC CHORRILLOS");
-      const validOffice = (oNorm) => ((oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri));
-      const counts = {}; for (const r of records){ if (!validOffice(normalize(r.office))) continue; if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue; if (!passesZ3(r)) continue; const pass = (selectedDay === "Todos") ? true : (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay))); if (!pass) continue; const key = r.canal || "Sin canal"; counts[key] = (counts[key] || 0) + 1; } return counts;
-    }
-    function countByPartWithFilters(){
-      const useAte = filterOffices.has("OFIC ATE"); const useChorri = filterOffices.has("OFIC CHORRILLOS");
-      const validOffice = (oNorm) => ((oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri));
-      const counts = {A:0, B:0, C:0}; for (const r of records){ if (!validOffice(normalize(r.office))) continue; if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue; if (!passesZ3(r)) continue; const pass = (selectedDay === "Todos") ? true : (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay))); if (!pass) continue; if (r.part && counts[r.part] !== undefined) counts[r.part]++; } return counts;
-    }
-    function countByDayWithFilters(){
-      const useAte = filterOffices.has("OFIC ATE"); const useChorri = filterOffices.has("OFIC CHORRILLOS");
-      const validOffice = (oNorm) => ((oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri));
-      const counts = {L:0,M:0,X:0,J:0,V:0,S:0}; for (const r of records){ if (!validOffice(normalize(r.office))) continue; if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue; if (!passesZ3(r)) continue; const dayArr = (viewMode === "Actual") ? r.days : (r.proposedDays || []); for (const d of dayArr){ const letter = dayNameToLetter[d]; if (letter && counts[letter] !== undefined) counts[letter]++; } } return counts;
-    }
+    function countByChannelWithFilters(){ const useAte = filterOffices.has("OFIC ATE"); const useChorri = filterOffices.has("OFIC CHORRILLOS"); const validOffice = (oNorm) => ((oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri)); const counts = {}; for (const r of records){ if (!validOffice(normalize(r.office))) continue; if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue; if (!passesZ3(r)) continue; const pass = (selectedDay === "Todos") ? true : (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay))); if (!pass) continue; const key = r.canal || "Sin canal"; counts[key] = (counts[key] || 0) + 1; } return counts; }
+    function countByPartWithFilters(){ const useAte = filterOffices.has("OFIC ATE"); const useChorri = filterOffices.has("OFIC CHORRILLOS"); const validOffice = (oNorm) => ((oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri)); const counts = {A:0, B:0, C:0}; for (const r of records){ if (!validOffice(normalize(r.office))) continue; if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue; if (!passesZ3(r)) continue; const pass = (selectedDay === "Todos") ? true : (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay))); if (!pass) continue; if (r.part && counts[r.part] !== undefined) counts[r.part]++; } return counts; }
+    function countByDayWithFilters(){ const useAte = filterOffices.has("OFIC ATE"); const useChorri = filterOffices.has("OFIC CHORRILLOS"); const validOffice = (oNorm) => ((oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri)); const counts = {L:0,M:0,X:0,J:0,V:0,S:0}; for (const r of records){ if (!validOffice(normalize(r.office))) continue; if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue; if (!passesZ3(r)) continue; const dayArr = (viewMode === "Actual") ? r.days : (r.proposedDays || []); for (const d of dayArr){ const letter = dayNameToLetter[d]; if (letter && counts[letter] !== undefined) counts[letter]++; } } return counts; }
 
-    function summarizeDistrict(featIdx){
-      const useAte = filterOffices.has("OFIC ATE"); const useChorri = filterOffices.has("OFIC CHORRILLOS");
-      const validOffice = (oNorm) => ((oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri));
-      const res = { total:0, A:0, B:0, C:0 };
-      for (const r of records){ if (r.featIdx !== featIdx) continue; if (!validOffice(normalize(r.office))) continue; if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue; if (!passesZ3(r)) continue; const pass = (selectedDay === "Todos") ? true : (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay))); if (!pass) continue; res.total++; if (r.part && res[r.part] !== undefined) res[r.part]++; }
-      return res;
-    }
+    function summarizeDistrict(featIdx){ const useAte = filterOffices.has("OFIC ATE"); const useChorri = filterOffices.has("OFIC CHORRILLOS"); const validOffice = (oNorm) => ((oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri)); const res = { total:0, A:0, B:0, C:0 }; for (const r of records){ if (r.featIdx !== featIdx) continue; if (!validOffice(normalize(r.office))) continue; if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue; if (!passesZ3(r)) continue; const pass = (selectedDay === "Todos") ? true : (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay))); if (!pass) continue; res.total++; if (r.part && res[r.part] !== undefined) res[r.part]++; } return res; }
 
     // ====== Partición y "snap" ======
-    function assignBalancedPartsAndSnapToDistricts(){
-      const sorted = [...records].sort((a,b)=>a.lon - b.lon);
-      const n = sorted.length; if (n === 0) return; const size = Math.ceil(n / 3), cut1 = size, cut2 = size * 2;
-      for (let i=0; i<n; i++){ const r = sorted[i]; r.part = (i < cut1) ? "A" : (i < cut2 ? "B" : "C"); r.proposedDays = partToDays[r.part]; r.proposedLetters = partToFreqLetters[r.part]; }
-      const byFeat = new Map();
-      for (const r of records){ const k = r.featIdx; if (k == null) continue; if (!byFeat.has(k)) byFeat.set(k, {A:0,B:0,C:0}); const entry = byFeat.get(k); entry[r.part] = (entry[r.part] || 0) + 1; }
-      featurePartByIdx = new Map();
-      for (const [idx, counts] of byFeat){ let maj="A", max=-1; for (const p of ["A","B","C"]) { if ((counts[p] || 0) > max){ max=(counts[p] || 0); maj=p; } } featurePartByIdx.set(idx, maj); }
-      for (const r of records){ const mj = featurePartByIdx.get(r.featIdx); if (mj && r.part !== mj){ r.part = mj; r.proposedDays = partToDays[mj]; r.proposedLetters = partToFreqLetters[mj]; } }
-    }
+    function assignBalancedPartsAndSnapToDistricts(){ const sorted = [...records].sort((a,b)=>a.lon - b.lon); const n = sorted.length; if (n === 0) return; const size = Math.ceil(n / 3), cut1 = size, cut2 = size * 2; for (let i=0; i<n; i++){ const r = sorted[i]; r.part = (i < cut1) ? "A" : (i < cut2 ? "B" : "C"); r.proposedDays = partToDays[r.part]; r.proposedLetters = partToFreqLetters[r.part]; } const byFeat = new Map(); for (const r of records){ const k = r.featIdx; if (k == null) continue; if (!byFeat.has(k)) byFeat.set(k, {A:0,B:0,C:0}); const entry = byFeat.get(k); entry[r.part] = (entry[r.part] || 0) + 1; } featurePartByIdx = new Map(); for (const [idx, counts] of byFeat){ let maj="A", max=-1; for (const p of ["A","B","C"]) { if ((counts[p] || 0) > max){ max=(counts[p] || 0); maj=p; } } featurePartByIdx.set(idx, maj); } for (const r of records){ const mj = featurePartByIdx.get(r.featIdx); if (mj && r.part !== mj){ r.part = mj; r.proposedDays = partToDays[mj]; r.proposedLetters = partToFreqLetters[mj]; } } }
 
     // ====== Ingesta ======
-    function ingestRows(rows){
-      const startIdx = hasHeader(rows[0]) ? 1 : 0; const prelim = [];
-      for (let i=startIdx; i<rows.length; i++){
-        const row = rows[i]; if (!row) continue; const code = (row[0] ?? "").toString().trim(); if (EXCLUDE_CODES.has(code)) continue;
-        const route = (row[12] ?? "").toString().trim(); const name = (row[7] ?? "").toString().trim(); const canal = (row[21] ?? "").toString().trim();
-        const interloc = (row[26] ?? "").toString().trim(); const lat = num(row[28]), lon = num(row[29]); if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-        const office = (row[46] ?? "").toString().trim(); const officeNorm = normalize(office); if (!OFFICES.has(officeNorm)) continue;
-        const container = getContainingFeature(lat, lon); if (!container) continue; const geoDistName = container.name; const geoDistNorm = normalize(geoDistName); if (EXCLUDE_DISTRICTS.has(geoDistNorm)) continue;
-        const propuestaFlag = (row[55] ?? "").toString().trim(); if (normalize(propuestaFlag) === PROPUESTA_BAJA_VAL) continue; if (interloc === EXCLUDE_INTERLOC) continue;
-        const canalNorm = normalize(canal); const nameNorm = normalizeName(name); if (canalNorm === "MOD"){ const hit = MOD_EXCLUDE_KEYWORDS.some(k => nameNorm.includes(k)); if (hit) continue; }
-        const csvDistrito = (row[17] ?? "").toString().trim(); const daysRaw = (row[48] ?? "").toString().trim(); const days = parseDays(daysRaw); const freqLetters = toFreqLetters(days);
-        prelim.push({ code, name, canal, canalNorm, distrito: csvDistrito, office, route, daysRaw, days, freqLetters, lat, lon, featIdx: container.idx, geoDistName, hadZ3: days.length > 2 });
-      }
-      const seen = new Set(); const deduped = [];
-      for (const r of prelim){ const key = `${normalizeName(r.name||"")}${Number.isFinite(r.lat)?r.lat.toFixed(6):""}${Number.isFinite(r.lon)?r.lon.toFixed(6):""}`; if (seen.has(key)) continue; seen.add(key); deduped.push(r); }
-      records = deduped; populateCanalFilter(records.map(r=>r.canal).filter(Boolean)); assignBalancedPartsAndSnapToDistricts(); refreshLayers();
-    }
+    function ingestRows(rows){ const startIdx = hasHeader(rows[0]) ? 1 : 0; const prelim = []; for (let i=startIdx; i<rows.length; i++){ const row = rows[i]; if (!row) continue; const code = (row[0] ?? "").toString().trim(); if (EXCLUDE_CODES.has(code)) continue; const route = (row[12] ?? "").toString().trim(); const name = (row[7] ?? "").toString().trim(); const canal = (row[21] ?? "").toString().trim(); const interloc = (row[26] ?? "").toString().trim(); const lat = num(row[28]), lon = num(row[29]); if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue; const office = (row[46] ?? "").toString().trim(); const officeNorm = normalize(office); if (!OFFICES.has(officeNorm)) continue; const container = getContainingFeature(lat, lon); if (!container) continue; const geoDistName = container.name; const geoDistNorm = normalize(geoDistName); if (EXCLUDE_DISTRICTS.has(geoDistNorm)) continue; const propuestaFlag = (row[55] ?? "").toString().trim(); if (normalize(propuestaFlag) === PROPUESTA_BAJA_VAL) continue; if (interloc === EXCLUDE_INTERLOC) continue; const canalNorm = normalize(canal); const nameNorm = normalizeName(name); if (canalNorm === "MOD"){ const hit = MOD_EXCLUDE_KEYWORDS.some(k => nameNorm.includes(k)); if (hit) continue; } const csvDistrito = (row[17] ?? "").toString().trim(); const daysRaw = (row[48] ?? "").toString().trim(); const days = parseDays(daysRaw); const freqLetters = toFreqLetters(days); prelim.push({ code, name, canal, canalNorm, distrito: csvDistrito, office, route, daysRaw, days, freqLetters, lat, lon, featIdx: container.idx, geoDistName, hadZ3: days.length > 2 }); } const seen = new Set(); const deduped = []; for (const r of prelim){ const key = `${normalizeName(r.name||"")}${Number.isFinite(r.lat)?r.lat.toFixed(6):""}${Number.isFinite(r.lon)?r.lon.toFixed(6):""}`; if (seen.has(key)) continue; seen.add(key); deduped.push(r); } records = deduped; populateCanalFilter(records.map(r=>r.canal).filter(Boolean)); assignBalancedPartsAndSnapToDistricts(); refreshLayers(); }
 
-    function populateCanalFilter(canalList){
-      const sel = document.getElementById('canalFilter'); const uniq = Array.from(new Set(canalList));
-      sel.innerHTML = `<option value="Todos">Todos</option>` + uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-    }
+    function populateCanalFilter(canalList){ const sel = document.getElementById('canalFilter'); const uniq = Array.from(new Set(canalList)); sel.innerHTML = `<option value="Todos">Todos</option>` + uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join(""); }
 
     // ====== Export CSV ======
-    document.getElementById('exportBtn').addEventListener('click', ()=>{
-      const rows = getFilteredRowsForExport();
-      const headers = ["Codigo Cliente","Nombre Cliente","Distrito Catalogo","Distrito GeoJson","Frecuencia Actual","Frecuencia Propuesta","Canal","Ruta","Latitud","Longitud","Oficina"];
-      const csv = [headers].concat(rows.map(r => [ r.code, r.name, r.distrito, r.geoDistName, r.freqLetters || "", r.proposedLetters || "", r.canal || "", r.route || "", r.lat, r.lon, r.office || "" ].map(v => csvEscape(v)).join(","))).join("\r\n");
-      const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"}); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "ATEII_export.csv"; a.click(); URL.revokeObjectURL(url);
-    });
-    function getFilteredRowsForExport(){
-      const useAte = filterOffices.has("OFIC ATE"); const useChorri = filterOffices.has("OFIC CHORRILLOS"); const validOffice = (oNorm) => ((oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri));
-      const out = []; for (const r of records){ if (!validOffice(normalize(r.office))) continue; if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue; if (filterZ3 && !r.hadZ3) continue; const pass = (selectedDay === "Todos") ? true : (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay))); if (!pass) continue; out.push(r); } return out;
-    }
-    function csvEscape(v){ const s = (v ?? "").toString(); if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`; return s; }
-
-    // ====== Events ======
-    document.getElementById('viewToggle').addEventListener('change', (e)=>{ viewMode = e.target.checked ? "Propuesta" : "Actual"; renderLegend(); refreshLayers(); });
-    document.getElementById('dayFilter').addEventListener('click', (e)=>{ if (e.target.tagName === "BUTTON"){ document.querySelectorAll('#dayFilter button').forEach(b=>b.classList.remove('active')); e.target.classList.add('active'); selectedDay = e.target.dataset.day; refreshLayers(); } });
-    document.getElementById('canalFilter').addEventListener('change', (e)=>{ selectedCanal = e.target.value || "Todos"; refreshLayers(); });
-    document.getElementById('oficAte').addEventListener('change', (e)=>{ if (e.target.checked) filterOffices.add("OFIC ATE"); else filterOffices.delete("OFIC ATE"); renderLegend(); refreshLayers(); });
-    document.getElementById('oficChorri').addEventListener('change', (e)=>{ if (e.target.checked) filterOffices.add("OFIC CHORRILLOS"); else filterOffices.delete("OFIC CHORRILLOS"); renderLegend(); refreshLayers(); });
-    document.getElementById('markersToggle').addEventListener('change', (e)=>{ showMarkers = e.target.checked; renderLegend(); refreshLayers(); });
-    document.getElementById('z3Toggle').addEventListener('change', (e)=>{ filterZ3 = e.target.checked; renderLegend(); refreshLayers(); });
-
-    // ====== Load GeoJSON + CSV ======
-    fetch(GEOJSON_URL)
-      .then(r => r.json())
-      .then(geo => {
-        areaFeatures = (geo && geo.type === "FeatureCollection") ? geo : { type:"FeatureCollection", features: [geo] };
-        areaFeatures.features.forEach((f,i)=>{ if(!f.properties) f.properties={}; f.properties.__idx=i; });
-        boundaryLayer.addData(areaFeatures);
-        try { const b=boundaryLayer.getBounds(); if (b && b.isValid()) map.fitBounds(b.pad(0.05)); } catch(e){}
-        Papa.parse(CSV_URL, {
-          download:true, dynamicTyping:false, skipEmptyLines:true,
-          complete: (results) => { const rows=results.data; if (!rows || !rows.length){ alert("No se pudo leer el CSV o está vacío."); return; } ingestRows(rows); },
-          error: (err) => { console.error(err); alert("Error al descargar o parsear el CSV."); }
-        });
-      })
-      .catch(err => {
-        console.error("No se pudo cargar el GeoJSON:", err);
-        alert("No se pudo cargar el GeoJSON de límites.");
-        Papa.parse(CSV_URL, {
-          download:true, dynamicTyping:false, skipEmptyLines:true,
-          complete: (results) => { const rows=results.data; if (!rows || !rows.length){ alert("No se pudo leer el CSV o está vacío."); return; } alert("Advertencia: no se aplicó el filtro por polígono (GeoJSON no disponible)."); ingestRows(rows); }
-        });
-      });
-
-    // Pintar leyenda inicial
-    renderLegend();
-  })();
-  </script>
-</body>
-</html>
+    document.getElementById('exportBtn').addEventListener('click', ()=>{ const rows = getFilteredRowsForExport(); const headers = ["Codigo Cliente","Nombre Cliente","Distrito Catalogo","Distrito GeoJson","Frecuencia Actual","Frecuencia Propuesta","Canal","Ruta","Latitud","Longitud","Oficina"]; const csv = [headers].concat(rows.map(r => [ r.code, r.name, r.distrito, r.geoDistName, r.freqLetters || "", r.proposedLetters || "", r.canal || "", r.route || "", r.lat, r.lon, r.office || "" ].map(v => csvEscape(v)).join(","))).join("\r\n"); const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"}); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "ATEII_export.csv"; a.click(); URL.revokeObjectURL(url); });
+    function getFilteredRowsForExport(){ const useAte = filterOffices.has("OFIC ATE"); const useChorri = filterOffices.has("OFIC CHORRILLOS"); const validOffice = (oNorm) => ((oNorm === "OFIC ATE" && useAte) || (oNorm === "OFIC CHORRILLOS" && useChorri)); const out = []; for (const r of records){ if (!validOffice(normalize(r.office))) continue; if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue; if (filterZ3 && !r.hadZ3) continue; const pass = (selectedDay === "Todos") ? true : (viewMode === "Actual" ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay))); if (!pass) continue; out.push
