@@ -55,7 +55,7 @@
  .toggle{
   width:44px; height:24px; background:#0b1320; border:1px solid var(--md-outline); border-radius:999px; position:relative; transition:.2s;
  }
- .knob{ width:20px; height:20px; background:#fff; border-radius:50%; position:absolute; top:1.5px; left:1.5px; transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,.5);}
+ .knob{ width:20px; height:20px; background:#fff; border-radius:50%; position:absolute; top:1.5px; left:1.5px; transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,.5);} 
  input[type="checkbox"].toggle-input{ display:none; }
  input[type="checkbox"].toggle-input:checked + .toggle{ background:var(--md-secondary); }
  input[type="checkbox"].toggle-input:checked + .toggle .knob{ left:22px; }
@@ -76,21 +76,18 @@
  .legend h4{ margin:0 0 6px 0; font-size:12px; }
  .legend .row{ display:flex; align-items:center; gap:6px; margin:4px 0; flex-wrap:wrap;}
  .swatch{ width:12px; height:12px; border-radius:2px; border:1px solid #0003; }
- .pill{ font-size:10px; padding:2px 6px; border:1px solid var(--md-outline); border-radius:999px; color:var(--md-muted); background:var(--chip-bg);}
+ .pill{ font-size:10px; padding:2px 6px; border:1px solid var(--md-outline); border-radius:999px; color:var(--md-muted); background:var(--chip-bg);} 
  a, a:visited{ color:#93c5fd; text-decoration:none; }
  a:hover{ text-decoration:underline; }
  .freq{
   display:inline-block; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-weight:800; font-size:12px; background:#0b1221; color:#c7d2fe; padding:2px 6px; border-radius:6px; border:1px solid #111827;
+  font-weight:800; font-size:12px; background:#0b1221; color:#c7d2fe; padding:2px 6px; border-radius:6px; border:1px solid #111827; 
  }
  .popup-line{ margin:3px 0; }
  .popup-muted{ color:#9CA3AF; }
  .leaflet-tooltip { background:#101826; color:#dbe7f3; border:1px solid #223144; border-radius:10px; box-shadow:var(--elev); }
  /* mover zoom a esquina inferior derecha (si el control está activo) */
  .leaflet-control-container .leaflet-bottom.leaflet-right { right: 16px; bottom: 16px; }
-
- /* Mejor señal visual de interactividad */
- .leaflet-pane .leaflet-interactive { cursor: pointer; } /* asegura cursor en shapes */
 </style>
 </head>
 <body>
@@ -143,7 +140,7 @@
         <span class="toggle"><span class="knob"></span></span>
       </label>
     </div>
-    <!-- +Z3 -->
+    <!-- +Z3: solo clientes que tenían >2 días (aplica en Actual y Propuesta) -->
     <div class="group" title="Mostrar solo clientes que tenían más de 2 días actuales (Actual y Propuesta)">
       <label class="switch">
         <span>+Z3</span>
@@ -157,15 +154,12 @@
     </div>
   </div>
 </header>
-
 <div id="map" role="application" aria-label="Mapa Leaflet de atención a clientes"></div>
 <div class="legend" id="legend"></div>
-
 <script>
 (function(){
   const CSV_URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
   const GEOJSON_URL = "https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson";
-
   // ====== Config ======
   const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   const EXCLUDE_DISTRICTS = new Set([
@@ -174,19 +168,18 @@
   const EXCLUDE_CODES = new Set(["11747415","11604173","11747406","11684549"]);
   const EXCLUDE_INTERLOC = "211087"; // col[26]
   const PROPUESTA_BAJA_VAL = "PROPUESTA BAJA"; // col[55], comparación normalizada
-
+  // MOD permitido salvo estos nombres
   const MOD_EXCLUDE_KEYWORDS = [
     "Plaza vea","SPSA Makro","Economax","Supermercados Peruanos","Mayorsa",
     "Metro","Cencosud","Tottus","CD Huachipa","Comidas gourmet","Delivery Hero","Ajiles","Solana"
   ].map(s => normalize(s));
-
   const dayLetterToName = { "L":"Lunes", "M":"Martes", "X":"Miércoles", "J":"Jueves", "V":"Viernes", "S":"Sábado" };
   const dayNameToLetter = { "Lunes":"L", "Martes":"M", "Miércoles":"X", "Jueves":"J", "Viernes":"V", "Sábado":"S" };
   const orderDays = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
   const partColors = { "A":"#5a76ff", "B":"#30c48d", "C":"#a56cff" };
-  const partFill   = { "A":"rgba(90,118,255,0.25)", "B":"rgba(48,196,141,0.25)", "C":"rgba(165,108,255,0.25)" };
+  const partFill = { "A":"#5a76ff", "B":"#30c48d", "C":"#a56cff" };
 
   // ====== UI State ======
   let viewMode = "Actual";
@@ -194,28 +187,23 @@
   let selectedCanal = "Todos";
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
   let showMarkers = true;
-  let filterZ3 = false;
+  let filterZ3 = false; // << ahora aplica en Actual y Propuesta
 
   // ====== Map & panes ======
   const map = L.map('map', { preferCanvas:true, zoomControl:false });
+  // Zoom abajo-derecha
   L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-  // Panes: aseguramos distritos por encima de markers para que reciban eventos
-  map.createPane('zonesPane');
-  map.getPane('zonesPane').style.zIndex = 650; // encima de markers (600)
-  map.createPane('markersPane');
-  map.getPane('markersPane').style.zIndex = 600;
-
+  map.createPane('zonesPane'); map.getPane('zonesPane').style.zIndex = 300;
+  map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600;
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
-
-  const currentLayer   = L.layerGroup().addTo(map);
-  const proposedLayer  = L.layerGroup();
-  const boundaryLayer  = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
+  const currentLayer = L.layerGroup().addTo(map);
+  const proposedLayer = L.layerGroup();
+  const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
   const districtsLayerHolder = L.layerGroup().addTo(map);
 
   // ====== Data ======
   let areaFeatures = null;
-  let records = []; // { ... , featIdx, geoDistName, ...}
+  let records = []; // {code,name,canal,canalNorm,distrito,office,route,days[],freqLetters,lat,lon,featIdx,geoDistName,part,proposedDays[],proposedLetters, hadZ3:boolean}
   let featurePartByIdx = new Map();
   let channelPalette = {};
 
@@ -241,9 +229,9 @@
     return orderDays.filter(d => set.has(d));
   }
   function toFreqLetters(dayArr){
-    return ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"].map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
+    return ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"]
+      .map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
   }
-
   const DIST_KEYS = ["NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist","nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"];
   function getFeatureDistName(f){
     const p = f?.properties || {};
@@ -268,8 +256,11 @@
   }
   function escapeHtml(str) {
     return (str ?? "").toString()
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      .replace(/&/g, "&amp;")
+      .replace(/</g,  "&lt;")
+      .replace(/>/g,  "&gt;")
+      .replace(/"/g,  "&quot;")
+      .replace(/'/g,  "&#39;");
   }
 
   // ====== Legend ======
@@ -295,6 +286,7 @@
       <div class="row">L: <span class="pill">${dayCounts.L}</span> M: <span class="pill">${dayCounts.M}</span> X: <span class="pill">${dayCounts.X}</span> J: <span class="pill">${dayCounts.J}</span> V: <span class="pill">${dayCounts.V}</span> S: <span class="pill">${dayCounts.S}</span></div>
     `;
   }
+
   function fitToContent(){
     let bounds = null;
     const layers = [];
@@ -309,6 +301,7 @@
     if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.08));
     else map.setView([-12.0464, -77.0428], 10);
   }
+
   function buildPopUp(r){
     const gm = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
     const proposedDaysStr = (r.proposedDays && r.proposedDays.length) ? r.proposedDays.join(", ") : "—";
@@ -351,13 +344,13 @@
       for (const r of records){
         if (!validOffice(normalize(r.office))) continue;
         if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
-
+        // Con Día = "Todos" NO filtramos por día
         let dayPass = true;
         if (selectedDay !== "Todos"){
           dayPass = (viewMode === "Actual") ? r.days.includes(selectedDay) : (r.proposedDays?.includes(selectedDay));
         }
         if (!dayPass) continue;
-
+        // +Z3 aplica en ambas vistas: si está ON, sólo quienes tenían >2 días actuales
         if (filterZ3 && !r.hadZ3) continue;
 
         const color = colorForChannel(r.canal || "");
@@ -366,7 +359,6 @@
           radius:5.6, stroke:true, weight:1, color:"#0b1221",
           fillColor: color, fillOpacity:0.95
         }).bindPopup(buildPopUp(r));
-
         (viewMode === "Actual" ? currentLayer : proposedLayer).addLayer(marker);
       }
     }
@@ -451,39 +443,20 @@
     districtsLayerHolder.clearLayers();
     if (!areaFeatures) return;
     areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
-
     const layer = L.geoJSON(areaFeatures, {
       pane:'zonesPane',
-      interactive: true,                // ← asegura eventos
-      bubblingMouseEvents: false,       // ← el polígono maneja el click
       style: (feature) => {
         const idx = feature.properties.__idx;
         const part = featurePartByIdx.get(idx);
         if (part){
-          return { color: partColors[part], weight: 1.6, fillColor: partFill[part], fillOpacity: 0.25 };
+          return { color: partColors[part], weight: 1.1, fillColor: partFill[part], fillOpacity: 0.18 };
         }
-        return { color:'#8b5cf6', weight:1.6, fillOpacity:0.12 };
+        return { color:'#ef4444', weight:1, fillOpacity:0 };
       },
       onEachFeature: (feature, polygonLayer) => {
         const name = getFeatureDistName(feature);
-
-        // Señal de hover (mejora puntería en Canvas)
-        polygonLayer.on('mouseover', function(){
-          this.setStyle({ weight: 3 });
-          if (this.bringToFront) this.bringToFront();
-        });
-        polygonLayer.on('mouseout', function(){
-          const idx = feature.properties.__idx;
-          const part = featurePartByIdx.get(idx);
-          const style = part
-            ? { color: partColors[part], weight: 1.6, fillColor: partFill[part], fillOpacity: 0.25 }
-            : { color:'#8b5cf6', weight:1.6, fillOpacity:0.12 };
-          this.setStyle(style);
-        });
-
-        // Tooltip (hover)
-        polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip'});
-
+        // Tooltip de distrito (hover) — aseguramos que se cree siempre
+        polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false});
         // Popup resumen (click)
         polygonLayer.on('click', (e) => {
           const idx = feature.properties.__idx;
@@ -495,13 +468,12 @@
               <div>Por parte → A: <strong>${resume.A}</strong> · B: <strong>${resume.B}</strong> · C: <strong>${resume.C}</strong></div>
             </div>
           `;
-          polygonLayer.bindPopup(html).openPopup(e.latlng);
+          L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
         });
       }
     });
     layer.addTo(districtsLayerHolder);
   }
-
   function summarizeDistrict(featIdx){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -559,53 +531,45 @@
     const prelim = [];
     for (let i=startIdx; i<rows.length; i++){
       const row = rows[i]; if (!row) continue;
-
       const code = (row[0] ?? "").toString().trim();
       if (EXCLUDE_CODES.has(code)) continue;
-
       const route = (row[12] ?? "").toString().trim(); // Ruta
-      const name  = (row[7]  ?? "").toString().trim();
+      const name = (row[7] ?? "").toString().trim();
       const canal = (row[21] ?? "").toString().trim();
       const interloc = (row[26] ?? "").toString().trim();
-
       const lat = num(row[28]), lon = num(row[29]);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-
       const office = (row[46] ?? "").toString().trim();
       const officeNorm = normalize(office);
       if (!OFFICES.has(officeNorm)) continue;
-
       const container = getContainingFeature(lat, lon);
       if (!container) continue;
       const geoDistName = container.name;
       const geoDistNorm = normalize(geoDistName);
       if (EXCLUDE_DISTRICTS.has(geoDistNorm)) continue;
-
+      // col[55]: Propuesta baja -> excluir
       const propuestaFlag = (row[55] ?? "").toString().trim();
       if (normalize(propuestaFlag) === PROPUESTA_BAJA_VAL) continue;
-
+      // interlocutor excluido
       if (interloc === EXCLUDE_INTERLOC) continue;
-
+      // MOD permitido salvo keywords en nombre
       const canalNorm = normalize(canal);
       const nameNorm = normalizeName(name);
       if (canalNorm === "MOD"){
         const hit = MOD_EXCLUDE_KEYWORDS.some(k => nameNorm.includes(k));
         if (hit) continue;
       }
-
       const csvDistrito = (row[17] ?? "").toString().trim();
       const daysRaw = (row[48] ?? "").toString().trim();
       const days = parseDays(daysRaw);
       const freqLetters = toFreqLetters(days);
-
       prelim.push({
         code, name, canal, canalNorm, distrito: csvDistrito, office, route,
         daysRaw, days, freqLetters, lat, lon,
         featIdx: container.idx, geoDistName,
-        hadZ3: days.length > 2
+        hadZ3: days.length > 2 // << marcador Z3
       });
     }
-
     // Deduplicación Nombre+Lat/Lon
     const seen = new Set(); const deduped = [];
     for (const r of prelim){
@@ -613,9 +577,11 @@
       if (seen.has(key)) continue; seen.add(key); deduped.push(r);
     }
     records = deduped;
-
+    // Filtro de canales (Todos + encontrados)
     populateCanalFilter(records.map(r=>r.canal).filter(Boolean));
+    // Particionar y snap
     assignBalancedPartsAndSnapToDistricts();
+    // Render
     refreshLayers();
   }
 
@@ -637,14 +603,12 @@
       r.proposedLetters || "", r.canal || "", r.route || "",
       r.lat, r.lon, r.office || ""
     ].map(v => csvEscape(v)).join(","))).join("\r\n");
-
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = "ATEII_export.csv"; a.click();
     URL.revokeObjectURL(url);
   });
-
   function getFilteredRowsForExport(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -664,7 +628,6 @@
     }
     return out;
   }
-
   function csvEscape(v){
     const s = (v ?? "").toString();
     if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
@@ -684,25 +647,6 @@
   document.getElementById('oficChorri').addEventListener('change', (e)=>{ if (e.target.checked) filterOffices.add("OFIC CHORRILLOS"); else filterOffices.delete("OFIC CHORRILLOS"); renderLegend(); refreshLayers(); });
   document.getElementById('markersToggle').addEventListener('change', (e)=>{ showMarkers = e.target.checked; renderLegend(); refreshLayers(); });
   document.getElementById('z3Toggle').addEventListener('change', (e)=>{ filterZ3 = e.target.checked; renderLegend(); refreshLayers(); });
-
-  // ====== Atajo opcional: clic derecho = popup de distrito bajo el cursor
-  map.on('contextmenu', (e) => {
-    if (!areaFeatures) return;
-    const lat = e.latlng.lat, lon = e.latlng.lng;
-    const found = getContainingFeature(lat, lon);
-    if (!found) return;
-    const name = found.name;
-    const resume = summarizeDistrict(found.idx);
-    const html = `
-      <div style="min-width:220px">
-        <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(name)}</div>
-        <div>Total clientes (visibles): <strong>${resume.total}</strong></div>
-        <div>Por parte → A: <strong>${resume.A}</strong> · B: <strong>${resume.B}</strong> · C: <strong>${resume.C}</strong></div>
-        <div style="margin-top:6px; color:#9fb0c3">Clic derecho = popup de distrito</div>
-      </div>
-    `;
-    L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
-  });
 
   // ====== Load GeoJSON + CSV ======
   fetch(GEOJSON_URL)
