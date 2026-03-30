@@ -290,6 +290,36 @@ function compactNumber(n){
   return n.toString();
 }
 
+/* Mapeo de letras a nombre de día */
+const dayLetterToName = {
+  "L": "Lunes",
+  "M": "Martes",
+  "X": "Miércoles",
+  "J": "Jueves",
+  "V": "Viernes",
+  "S": "Sábado"
+};
+
+/* Mapeo inverso de nombre a letra */
+const dayNameToLetter = {
+  "Lunes": "L",
+  "Martes": "M",
+  "Miércoles": "X",
+  "Jueves": "J",
+  "Viernes": "V",
+  "Sábado": "S"
+};
+
+/* Orden estándar de días */
+const orderDays = [
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado"
+];
+  
 function escapeHtml(str){
   return (str ?? "").toString()
     .replace(/&/g,"&amp;")
