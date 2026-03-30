@@ -342,6 +342,20 @@ function parseDays(raw){
   return orderDays.filter(d => set.has(d));
 }
 ``  
+/* =====================================================
+   POBLAR FILTRO DE CANALES (UI)
+=====================================================*/
+function populateCanalFilter(canalList){
+  const sel = document.getElementById("canalFilter");
+  const uniq = Array.from(new Set(canalList));
+  
+  sel.innerHTML =
+    `<option value="Todos">Todos</option>` +
+    uniq
+      .sort()
+      .map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
+      .join("");
+}
   
 /* Normalización texto */
 function normalize(s){
