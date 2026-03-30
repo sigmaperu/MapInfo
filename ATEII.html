@@ -290,6 +290,29 @@ function compactNumber(n){
   return n.toString();
 }
 
+function escapeHtml(str){
+  return (str ?? "").toString()
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+}
+
+function parseDays(raw){
+  const s = (raw ?? "").toString()
+    .toUpperCase()
+    .replace(/[^LMXJVS]/g,"");
+  const set = new Set();
+  for(const ch of s){
+    if(dayLetterToName[ch]){
+      set.add(dayLetterToName[ch]);
+    }
+  }
+  return orderDays.filter(d => set.has(d));
+}
+``  
+  
 /* Normalización texto */
 function normalize(s){
   try{
@@ -312,6 +335,19 @@ function num(s){
   return Number.isFinite(v)?v:NaN;
 }
 
+function parseDays(raw){
+  const s = (raw ?? "").toString()
+    .toUpperCase()
+    .replace(/[^LMXJVS]/g,"");
+  const set = new Set();
+  for(const ch of s){
+    if(dayLetterToName[ch]){
+      set.add(dayLetterToName[ch]);
+    }
+  }
+  return orderDays.filter(d => set.has(d));
+}
+  
 /* Variables globales */
 const CSV_URL  = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
 const VOL_URL  = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Vol_Prom.csv";
