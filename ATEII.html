@@ -1,22 +1,19 @@
+<!-- INICIO PARTE 1/20 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ATEII – Atención actual vs propuesta</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ATEII 2026 · Actual · Prop Clie · Prop Kg</title>
 
-<!-- Leaflet -->
+<!-- SECTION: Libraries -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- PapaParse (CSV) -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
-<!-- Turf.js (geo utilidades) -->
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
+<!-- SECTION: Global Styles -->
 <style>
-/* ===== Material Design (dark) tokens (compact) ===== */
 :root{
   --md-bg:#0b0f14;
   --md-surface:#0f1520;
@@ -27,202 +24,238 @@
   --md-primary:#7c4dff;
   --md-secondary:#03dac6;
   --chip-bg:#0d1522;
-  --elev: 0 2px 10px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+  --elev:0 2px 10px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.25);
 }
 
-*{ box-sizing:border-box }
 body{
   margin:0;
-  font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
   background:var(--md-bg);
   color:var(--md-text);
 }
 
 header{
-  position:sticky; top:0; z-index:1000;
-  padding:8px 10px;
+  position:sticky;
+  top:0;
+  z-index:1000;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px;
+  padding:4px 8px;
+  background:linear-gradient(180deg,#0b0f14,#0f1520);
   border-bottom:1px solid var(--md-outline);
-  display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-  background:linear-gradient(180deg, #0b0f14 0%, #0f1520 100%);
   box-shadow:var(--elev);
 }
 
-h1{ font-size:15px; margin:0; letter-spacing:.2px; font-weight:700; }
-.muted{ color:var(--md-muted); font-size:11px; }
-.controls{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+h1{
+  margin:0;
+  font-size:13px;
+  font-weight:700;
+}
+
+.muted{
+  font-size:10px;
+  color:var(--md-muted);
+}
+
+.mode-bar{
+  display:flex;
+  gap:6px;
+}
+
+.mode-btn{
+  border:0;
+  background:transparent;
+  color:var(--md-text);
+  font-size:11px;
+  font-weight:600;
+  cursor:pointer;
+  padding:2px 4px;
+}
+
+.mode-btn.active{
+  color:var(--md-primary);
+  text-decoration:underline;
+}
+
+.controls{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  align-items:center;
+}
 
 .group{
-  display:flex; gap:6px; align-items:center; padding:6px 8px;
+  display:flex;
+  gap:4px;
+  align-items:center;
+  padding:4px 6px;
   background:var(--md-surface-2);
   border:1px solid var(--md-outline);
-  border-radius:10px;
+  border-radius:8px;
 }
 
 .segmented{
-  display:flex; overflow:hidden; border-radius:9px;
+  display:flex;
+  overflow:hidden;
   border:1px solid var(--md-outline);
+  border-radius:7px;
   background:var(--chip-bg);
 }
+
 .segmented button{
-  background:transparent; color:var(--md-text);
-  border:0; padding:5px 8px; cursor:pointer;
-  font-weight:600; font-size:12px;
+  border:0;
+  padding:4px 6px;
+  background:transparent;
+  color:var(--md-text);
+  font-size:11px;
+  font-weight:600;
+  cursor:pointer;
 }
+
 .segmented button.active{
-  background:var(--md-primary); color:#0a0716;
+  background:var(--md-primary);
+  color:#0a0716;
 }
-.segmented button + button{ border-left:1px solid var(--md-outline); }
+
+.segmented button+button{
+  border-left:1px solid var(--md-outline);
+}
 
 label.switch{
-  display:inline-flex; align-items:center; gap:6px;
-  cursor:pointer; user-select:none; font-weight:600; font-size:12px;
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  font-size:11px;
+  font-weight:600;
+  cursor:pointer;
 }
 
 .toggle{
-  width:44px; height:24px; background:#0b1320;
-  border:1px solid var(--md-outline); border-radius:999px;
-  position:relative; transition:.2s;
+  width:36px; height:18px;
+  border-radius:999px;
+  background:#0b1320;
+  border:1px solid var(--md-outline);
+  position:relative;
 }
+
 .knob{
-  width:20px; height:20px; background:#fff;
-  border-radius:50%; position:absolute; top:1.5px; left:1.5px;
-  transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,.5);
+  width:14px; height:14px;
+  background:#fff;
+  border-radius:50%;
+  position:absolute;
+  top:1px; left:1px;
+  transition:.2s;
 }
+
 input[type="checkbox"].toggle-input{ display:none; }
+
 input[type="checkbox"].toggle-input:checked + .toggle{
   background:var(--md-secondary);
 }
+
 input[type="checkbox"].toggle-input:checked + .toggle .knob{
-  left:22px;
+  left:19px;
 }
 
 .select{
-  appearance:none; background:#0b1320; border:1px solid var(--md-outline);
-  color:var(--md-text); padding:6px 8px; border-radius:9px;
-  font-weight:600; font-size:12px;
+  background:#0b1320;
+  border:1px solid var(--md-outline);
+  padding:4px 6px;
+  border-radius:7px;
+  color:var(--md-text);
+  font-size:11px;
+  font-weight:600;
 }
 
 .btn{
-  padding:6px 10px; border:1px solid var(--md-outline);
-  background:#1a2030; color:#dcd3ff; border-radius:9px;
-  cursor:pointer; font-weight:700; letter-spacing:.3px; font-size:12px;
+  background:#1a2030;
+  border:1px solid var(--md-outline);
+  padding:4px 6px;
+  border-radius:7px;
+  color:#dcd3ff;
+  font-size:11px;
+  font-weight:700;
+  cursor:pointer;
 }
-.btn:hover{ filter:brightness(1.12); }
 
 #map{
-  height: calc(100vh - 86px);
+  height:calc(100vh - 70px);
 }
 
-/* Leyenda con volumen compacto */
 .legend{
-  position:absolute; bottom:12px; left:12px; z-index:600;
+  position:absolute;
+  bottom:12px; left:12px;
   background:var(--md-surface);
   border:1px solid var(--md-outline);
-  border-radius:12px; padding:12px; font-size:12px;
-  max-width:380px; box-shadow:var(--elev);
+  padding:10px;
+  border-radius:10px;
+  font-size:11px;
+  max-width:330px;
+  box-shadow:var(--elev);
 }
-.legend h4{
-  margin:0 0 6px 0; font-size:12px;
-}
-.legend .row{
-  display:flex; align-items:center; gap:6px;
-  margin:4px 0; flex-wrap:wrap;
-}
+
 .swatch{
-  width:12px; height:12px;
+  width:10px; height:10px;
   border-radius:2px;
   border:1px solid #0003;
 }
 
 .pill{
-  font-size:10px;
-  padding:2px 6px;
-  border:1px solid var(--md-outline);
-  border-radius:999px;
-  color:var(--md-muted);
+  font-size:9px;
+  padding:2px 4px;
   background:var(--chip-bg);
+  border:1px solid var(--md-outline);
+  border-radius:12px;
+  color:var(--md-muted);
 }
-
-a, a:visited{
-  color:#93c5fd; text-decoration:none;
-}
-a:hover{ text-decoration:underline; }
 
 .freq{
-  display:inline-block;
-  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas,"Liberation Mono", monospace;
-  font-weight:800; font-size:12px;
-  background:#0b1221; color:#c7d2fe;
-  padding:2px 6px; border-radius:6px; border:1px solid #111827;
+  font-family:ui-monospace,monospace;
+  font-size:11px;
+  font-weight:800;
+  color:#c7d2fe;
+  background:#0b1221;
+  padding:2px 4px;
+  border-radius:5px;
+  border:1px solid #111827;
 }
 
-.popup-line{ margin:3px 0; }
-.popup-muted{ color:#9CA3AF; }
-
-.leaflet-tooltip{
-  background:#101826; color:#dbe7f3;
-  border:1px solid #223144; border-radius:10px;
-  box-shadow:var(--elev);
-}
-
-/* Zoom bottom-right */
 .leaflet-control-container .leaflet-bottom.leaflet-right{
-  right:16px; bottom:16px;
+  bottom:12px; right:12px;
 }
 
-/* Colores sólidos de zonas */
-.zone-A{
-  fill-opacity:0.45 !important;
-  stroke:#00000055 !important;
-  stroke-width:2px !important;
-}
-.zone-B{
-  fill-opacity:0.45 !important;
-  stroke:#00000055 !important;
-  stroke-width:2px !important;
-}
-.zone-C{
-  fill-opacity:0.45 !important;
-  stroke:#00000055 !important;
-  stroke-width:2px !important;
-}
+</style>
+<!-- FIN PARTE 1/20 -->
+
+<!-- INICIO PARTE 2/20 -->
+
 </style>
 </head>
-
 <body>
 
+<!-- SECTION: Header -->
 <header>
-  <div style="display:flex; flex-direction:column; gap:2px;">
-    <h1>ATEII · Mapa de atención</h1>
-    <div class="muted">
-      CSV: Catalogo Sigma + Volumenes · GeoJSON distritos
-    </div>
+
+  <div style="display:flex; flex-direction:column; line-height:1;">
+    <h1>ATEII · Atención 2026</h1>
+    <div class="muted">Actual · Prop Clie · Prop Kg</div>
   </div>
 
+  <!-- SECTION: Mode Switch (Actual / Prop Clie / Prop Kg) -->
+  <div class="mode-bar">
+    <button class="mode-btn active" data-mode="actual">Actual</button>
+    <button class="mode-btn" data-mode="clie">Prop Clie</button>
+    <button class="mode-btn" data-mode="kg">Prop Kg</button>
+  </div>
+
+  <!-- SECTION: Controls -->
   <div class="controls">
 
-    <!-- Vista -->
+    <!-- Día -->
     <div class="group">
-      <label class="switch" title="Actual / Propuesta">
-        <span>Actual</span>
-        <input id="viewToggle" class="toggle-input" type="checkbox"/>
-        <span class="toggle"><span class="knob"></span></span>
-        <span>Propuesta</span>
-      </label>
-    </div>
-
-    <!-- Tipo partición -->
-    <div class="group">
-      <strong style="font-size:11px;">Partición:</strong>
-      <div id="partChoice" class="segmented">
-        <button data-mode="clientes" class="active">Clientes</button>
-        <button data-mode="volumen">Volumen</button>
-      </div>
-    </div>
-
-    <!-- Filtro día -->
-    <div class="group">
-      <strong style="font-size:11px;">Día:</strong>
+      <strong style="font-size:10px;">Día:</strong>
       <div id="dayFilter" class="segmented">
         <button data-day="Todos" class="active">Todos</button>
         <button data-day="Lunes">L</button>
@@ -236,135 +269,140 @@ a:hover{ text-decoration:underline; }
 
     <!-- Canal -->
     <div class="group">
-      <strong style="font-size:11px;">Canal:</strong>
-      <select id="canalFilter" class="select"></select>
+      <strong style="font-size:10px;">Canal:</strong>
+      <select id="canalFilter" class="select">
+        <option value="Todos">Todos</option>
+      </select>
     </div>
 
-    <!-- Oficinas -->
+    <!-- Oficina -->
     <div class="group">
-      <strong style="font-size:11px;">Oficina:</strong>
-      <label><input type="checkbox" id="oficAte" checked> <span class="pill">Ofic Ate</span></label>
-      <label><input type="checkbox" id="oficChorri" checked> <span class="pill">Ofic Chorrillos</span></label>
+      <strong style="font-size:10px;">Ofic:</strong>
+      <label><input type="checkbox" id="oficAte" checked> <span class="pill">Ate</span></label>
+      <label><input type="checkbox" id="oficChorri" checked> <span class="pill">Chorr</span></label>
     </div>
 
     <!-- Marcadores -->
     <div class="group">
       <label class="switch">
-        <span>Marcadores</span>
-        <input id="markersToggle" class="toggle-input" type="checkbox" checked/>
+        <span>Marc</span>
+        <input id="markersToggle" class="toggle-input" type="checkbox" checked>
         <span class="toggle"><span class="knob"></span></span>
       </label>
     </div>
 
     <!-- Z3 -->
-    <div class="group" title="Clientes con más de 2 días actuales">
+    <div class="group">
       <label class="switch">
-        <span>+Z3</span>
-        <input id="z3Toggle" class="toggle-input" type="checkbox"/>
+        <span>Z3</span>
+        <input id="z3Toggle" class="toggle-input" type="checkbox">
         <span class="toggle"><span class="knob"></span></span>
       </label>
     </div>
 
-    <!-- Exportar -->
+    <!-- Export -->
     <div class="group">
-      <button id="exportBtn" class="btn">Exportar CSV</button>
+      <button id="exportBtn" class="btn">CSV</button>
     </div>
 
-  </div>
+  </div> <!-- end controls -->
+
 </header>
 
+<!-- SECTION: Map + Legend -->
 <div id="map"></div>
 <div class="legend" id="legend"></div>
 
+<!-- SECTION: Script Start -->
 <script>
 (function(){
 
-/* =====================================
-   FUNCIONES BASE
-=====================================*/
+/* SECTION: Core URLs */
+const CSV_URL     = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
+const VOL_URL     = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Vol_Prom.csv";
+const GEOJSON_URL = "https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson";
 
-/* Número compacto para volúmenes */
-function compactNumber(n){
-  if(n >= 1_000_000) return (n/1_000_000).toFixed(1)+"M";
-  if(n >= 1_000)    return (n/1_000).toFixed(1)+"k";
-  return n.toString();
-}
+/* SECTION: Config */
+const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-/* Mapeo de letras a nombre de día */
-const dayLetterToName = {
-  "L": "Lunes",
-  "M": "Martes",
-  "X": "Miércoles",
-  "J": "Jueves",
-  "V": "Viernes",
-  "S": "Sábado"
+<!-- FIN PARTE 2/20 -->
+
+<!-- INICIO PARTE 3/20 -->
+
+/* SECTION: Exclusions */
+const EXCLUDE_DISTRICTS = new Set([
+  "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA",
+  "VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
+].map(s => normalize(s)));
+
+const EXCLUDE_CODES = new Set(["11747415","11604173","11747406","11684549"]);
+const EXCLUDE_INTERLOC = "211087";
+const PROPUESTA_BAJA_VAL = "PROPUESTA BAJA";
+
+const MOD_EXCLUDE_KEYWORDS = [
+  "Plaza vea","SPSA Makro","Economax","Supermercados Peruanos",
+  "Mayorsa","Metro","Cencosud","Tottus","CD Huachipa",
+  "Comidas gourmet","Delivery Hero","Ajiles","Solana"
+].map(s => normalize(s));
+
+/* SECTION: Days */
+const dayLetterToName = { L:"Lunes", M:"Martes", X:"Miércoles", J:"Jueves", V:"Viernes", S:"Sábado" };
+const dayNameToLetter = { "Lunes":"L","Martes":"M","Miércoles":"X","Jueves":"J","Viernes":"V","Sábado":"S" };
+const orderDays = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+
+/* SECTION: Parts A/B/C */
+const partToDays = {
+  A:["Lunes","Jueves"],
+  B:["Martes","Viernes"],
+  C:["Miércoles","Sábado"]
 };
+const partToFreqLetters = { A:"LJ", B:"MV", C:"XS" };
+const partColors = { A:"#5a76ff", B:"#30c48d", C:"#a56cff" };
+const partFill   = { A:"#5a76ff", B:"#30c48d", C:"#a56cff" };
 
-/* Mapeo inverso de nombre a letra */
-const dayNameToLetter = {
-  "Lunes": "L",
-  "Martes": "M",
-  "Miércoles": "X",
-  "Jueves": "J",
-  "Viernes": "V",
-  "Sábado": "S"
-};
+/* SECTION: App State */
+let viewMode = "actual";
+let selectedDay = "Todos";
+let selectedCanal = "Todos";
+let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
+let showMarkers = true;
+let filterZ3 = false;
 
-/* Orden estándar de días */
-const orderDays = [
-  "Lunes",
-  "Martes",
-  "Miércoles",
-  "Jueves",
-  "Viernes",
-  "Sábado"
-];
-  
-function escapeHtml(str){
-  return (str ?? "").toString()
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;")
-    .replace(/'/g,"&#039;");
-}
+/* SECTION: Map Setup */
+const map = L.map("map",{ preferCanvas:true, zoomControl:false });
+L.control.zoom({ position:"bottomright" }).addTo(map);
 
-function parseDays(raw){
-  const s = (raw ?? "").toString()
-    .toUpperCase()
-    .replace(/[^LMXJVS]/g,"");
-  const set = new Set();
-  for(const ch of s){
-    if(dayLetterToName[ch]){
-      set.add(dayLetterToName[ch]);
-    }
-  }
-  return orderDays.filter(d => set.has(d));
-}
-``  
-/* =====================================================
-   POBLAR FILTRO DE CANALES (UI)
-=====================================================*/
-function populateCanalFilter(canalList){
-  const sel = document.getElementById("canalFilter");
-  const uniq = Array.from(new Set(canalList));
-  
-  sel.innerHTML =
-    `<option value="Todos">Todos</option>` +
-    uniq
-      .sort()
-      .map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
-      .join("");
-}
-  
-/* Normalización texto */
+map.createPane("zonesPane").style.zIndex = 300;
+map.createPane("markersPane").style.zIndex = 600;
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+  attribution:"© OpenStreetMap"
+}).addTo(map);
+
+/* SECTION: Layers */
+const currentLayer    = L.layerGroup().addTo(map);
+const propuestaClie   = L.layerGroup();
+const propuestaKg     = L.layerGroup();
+const boundaryLayer   = L.geoJSON(null,{ pane:"zonesPane", style:{ color:"#ef4444", weight:1, fill:false }}).addTo(map);
+const districtsLayer  = L.layerGroup().addTo(map);
+
+/* SECTION: Data Containers */
+let areaFeatures = null;
+let records = [];
+let volumenDict = {};
+let neighbors = {};
+
+let featurePart_Clientes = new Map();
+let featurePart_Kg = new Map();
+
+/* SECTION: Utils */
 function normalize(s){
   try{
-    return (s??"").toString()
+    return (s ?? "").toString()
       .normalize("NFD").replace(/\p{Diacritic}/gu,"")
       .toUpperCase().trim();
   }catch(e){
-    return (s??"").toString().toUpperCase().trim();
+    return (s ?? "").toString().toUpperCase().trim();
   }
 }
 
@@ -373,87 +411,49 @@ function normalizeName(s){
 }
 
 function num(s){
-  if(s==null) return NaN;
-  const t=s.toString().replace(",",".");
-  const v=parseFloat(t);
-  return Number.isFinite(v)?v:NaN;
+  if(s == null) return NaN;
+  const t = s.toString().replace(",",".");
+  const v = parseFloat(t);
+  return Number.isFinite(v) ? v : NaN;
+}
+
+function escapeHtml(str){
+  return (str ?? "").toString()
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
 }
 
 function parseDays(raw){
-  const s = (raw ?? "").toString()
-    .toUpperCase()
-    .replace(/[^LMXJVS]/g,"");
+  const s = (raw ?? "").toString().toUpperCase().replace(/[^LMXJVS]/g,"");
   const set = new Set();
   for(const ch of s){
-    if(dayLetterToName[ch]){
-      set.add(dayLetterToName[ch]);
-    }
+    if(dayLetterToName[ch]) set.add(dayLetterToName[ch]);
   }
   return orderDays.filter(d => set.has(d));
 }
-  
-/* Variables globales */
-const CSV_URL  = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
-const VOL_URL  = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Vol_Prom.csv";
-const GEOJSON_URL = "https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson";
 
-let records = [];
-let volumenDict = {};
-let areaFeatures = null;
-let neighbors = {};   // contigüidad automática
-
-let viewMode = "Actual";
-let partMode = "clientes";
-let selectedDay = "Todos";
-let selectedCanal = "Todos";
-let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
-let showMarkers = true;
-let filterZ3 = false;
-
-/* Map setup */
-const map = L.map('map',{ preferCanvas:true, zoomControl:false });
-L.control.zoom({position:'bottomright'}).addTo(map);
-
-map.createPane("zonesPane").style.zIndex = 300;
-map.createPane("markersPane").style.zIndex = 600;
-
-L.tileLayer(
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  { attribution:"© OpenStreetMap" }
-).addTo(map);
-
-const currentLayer  = L.layerGroup().addTo(map);
-const proposedLayer = L.layerGroup();
-const boundaryLayer = L.geoJSON(null,{
-  pane:"zonesPane",
-  style:{ color:"#ef4444", weight:1, fill:false }
-}).addTo(map);
-
-const districtsLayerHolder = L.layerGroup().addTo(map);
-
-``
-
- /* =====================================
-   INGESTA DE VOLUMENES (Vol_Prom.csv)
-=====================================*/
-function ingestVolumenes(rows){
-  for(let i=1; i<rows.length; i++){
-    const row = rows[i];
-    if(!row || row.length < 2) continue;
-
-    const code = (row[0] ?? "").toString().trim();
-    const vol  = Number(row[1]) || 0;
-
-    if(code) volumenDict[code] = vol;
-  }
+function toFreqLetters(days){
+  return orderDays.map(d => days.includes(d) ? dayNameToLetter[d] : "").join("");
 }
 
-/* =====================================
-   LECTURA DE DISTRITO DESDE GEOJSON
-=====================================*/
+function compactNumber(n){
+  if(n >= 1_000_000) return (n/1_000_000).toFixed(1)+"M";
+  if(n >= 1_000)     return (n/1_000).toFixed(1)+"k";
+  return n.toString();
+}
+
+<!-- FIN PARTE 3/20 -->
+
+<!-- INICIO PARTE 4/20 -->
+
+/* SECTION: GeoJSON District Name */
 const DIST_KEYS = [
-  "NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist",
-  "nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"
+  "NOMBDIST","DISTRITO","DIST","NOMBRE","NAME",
+  "nom_dist","nomdistr","distrito","Distrito",
+  "NOMDIST","NOMBREDIST","NOMB_DIST"
 ];
 
 function getFeatureDistName(f){
@@ -471,491 +471,321 @@ function getFeatureDistName(f){
   return "Distrito";
 }
 
-/* =====================================
-   VER SI UNA FILA TIENE HEADERS
-=====================================*/
-function hasHeader(row){
-  const a = num(row[28]);
-  const b = num(row[29]);
-  const t28 = (row[28] ?? "").toString().toLowerCase();
-  const t29 = (row[29] ?? "").toString().toLowerCase();
-
-  if(!Number.isFinite(a) || !Number.isFinite(b)) return true;
-  if(t28.includes("lat") || t29.includes("lon")) return true;
-
-  return false;
+/* SECTION: Locate District Containing Point */
+function getContainingFeature(lat, lon){
+  if(!areaFeatures) return null;
+  const pt = turf.point([lon, lat]);
+  const feats = areaFeatures.features ?? [];
+  for(let i=0;i<feats.length;i++){
+    if(turf.booleanPointInPolygon(pt, feats[i])){
+      return { idx:i, name:getFeatureDistName(feats[i]) };
+    }
+  }
+  return null;
 }
 
-/* =====================================
-   INGESTA DEL CSV PRINCIPAL (Sigma)
-=====================================*/
-function ingestRows(rows){
+/* SECTION: District Contiguity (neighbors[]) */
+function computeContiguity(){
+  if(!areaFeatures || !areaFeatures.features) return;
+  const feats = areaFeatures.features;
+  const N = feats.length;
 
+  for(let i=0;i<N;i++){ neighbors[i] = []; }
+
+  for(let i=0;i<N;i++){
+    for(let j=i+1;j<N;j++){
+      try{
+        if(turf.booleanIntersects(feats[i], feats[j])){
+          neighbors[i].push(j);
+          neighbors[j].push(i);
+        }
+      }catch(e){}
+    }
+  }
+
+  for(let i=0;i<N;i++){
+    neighbors[i] = Array.from(new Set(neighbors[i]));
+  }
+}
+
+/* SECTION: Load Volumenes */
+function ingestVolumenes(rows){
+  for(let i=1;i<rows.length;i++){
+    const row = rows[i];
+    if(!row || row.length<2) continue;
+    const code = (row[0] ?? "").toString().trim();
+    const vol  = Number(row[1]) || 0;
+    if(code) volumenDict[code] = vol;
+  }
+}
+
+<!-- FIN PARTE 4/20 -->
+
+<!-- INICIO PARTE 5/20 -->
+
+/* SECTION: Ingest Catalog CSV */
+function ingestRows(rows){
   const startIdx = hasHeader(rows[0]) ? 1 : 0;
   const prelim = [];
 
-  for(let i=startIdx; i<rows.length; i++){
-    const row = rows[i];
+  for(let i=startIdx;i<rows.length;i++){
+    const row = rows[i]; 
     if(!row) continue;
 
     const code = (row[0] ?? "").toString().trim();
     if(!code) continue;
+    if(EXCLUDE_CODES.has(code)) continue;
 
     const name  = (row[7]  ?? "").toString().trim();
     const canal = (row[21] ?? "").toString().trim();
+    const inter = (row[26] ?? "").toString().trim();
     const lat   = num(row[28]);
     const lon   = num(row[29]);
-    const office = (row[46] ?? "").toString().trim();
+    const off   = (row[46] ?? "").toString().trim();
+    const csvD  = (row[17] ?? "").toString().trim();
 
     if(!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    if(!OFFICES.has(normalize(off))) continue;
 
-    // Localizar distrito por polígono
-    const container = getContainingFeature(lat, lon);
+    const container = getContainingFeature(lat,lon);
     if(!container) continue;
 
-    // Armar objeto preliminar
+    const geoName = container.name;
+    if(EXCLUDE_DISTRICTS.has(normalize(geoName))) continue;
+
+    const propFlag = (row[55] ?? "").toString().trim();
+    if(normalize(propFlag) === PROPUESTA_BAJA_VAL) continue;
+
+    if(inter === EXCLUDE_INTERLOC) continue;
+
+    const canalNorm = normalize(canal);
+    const nameNorm  = normalizeName(name);
+
+    if(canalNorm === "MOD"){
+      if(MOD_EXCLUDE_KEYWORDS.some(k => nameNorm.includes(k))) continue;
+    }
+
     const daysRaw = (row[48] ?? "").toString().trim();
-    const days = parseDays(daysRaw);
-    const freqLetters = days
-      .map(d => dayNameToLetter[d] ?? "")
-      .join("");
+    const days    = parseDays(daysRaw);
+    const freq    = toFreqLetters(days);
+    const volKg   = volumenDict[code] ?? 0;
 
     prelim.push({
       code,
       name,
       canal,
-      canalNorm: normalize(canal),
-      distrito: (row[17] ?? "").toString().trim(),
-      office,
-      lat, lon,
+      distrito: csvD,
+      office: off,
+      days,
+      freqLetters:freq,
+      lat,
+      lon,
       featIdx: container.idx,
-      geoDistName: container.name,
-      daysRaw, days, freqLetters,
-      volume: volumenDict[code] ?? 0,   // volumen ya unido
-      hadZ3: days.length > 2
+      geoDistName: geoName,
+      hadZ3: days.length > 2,
+      volume: volKg
     });
   }
 
-  /* Deduplicación */
+  /* Deduplicate */
   const seen = new Set();
-  const dedupe = [];
-
+  const dedup = [];
   for(const r of prelim){
-    const key = `${normalizeName(r.name)}_${r.lat.toFixed(6)}_${r.lon.toFixed(6)}`;
-    if(seen.has(key)) continue;
-    seen.add(key);
-    dedupe.push(r);
+    const k = `${normalizeName(r.name)}_${r.lat.toFixed(6)}_${r.lon.toFixed(6)}`;
+    if(seen.has(k)) continue;
+    seen.add(k);
+    dedup.push(r);
   }
 
-  records = dedupe;
+  records = dedup;
 
-  // Filtro canales
   populateCanalFilter(records.map(r => r.canal).filter(Boolean));
 
-  // Particiones se harán luego (en otra parte)
+  assignBalancedParts_Clientes();
+  assignBalancedParts_Kg();
+
+  refreshLayers();
 }
 
-/* =====================================
-   DETECTAR FEATURE QUE CONTIENE UN PUNTO
-=====================================*/
-function getContainingFeature(lat, lon){
-  if(!areaFeatures) return null;
-
-  const pt = turf.point([lon, lat]);
-  const feats = areaFeatures.features ?? [];
-
-  for(let i=0; i<feats.length; i++){
-    if(turf.booleanPointInPolygon(pt, feats[i])){
-      return { idx:i, name:getFeatureDistName(feats[i]) };
-    }
-  }
-  return null;
+/* SECTION: Populate Canal Filter */
+function populateCanalFilter(canalList){
+  const sel = document.getElementById("canalFilter");
+  const uniq = Array.from(new Set(canalList));
+  sel.innerHTML = 
+    `<option value="Todos">Todos</option>` +
+    uniq.sort().map(c =>
+      `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
+    ).join("");
 }
 
-/* =====================================
-   CARGA DE ARCHIVOS (Volumen + GeoJSON + CSV)
-=====================================*/
-function loadAll(){
-
-  // 1. Cargar volumenes
-  Papa.parse(VOL_URL,{
-    download:true,
-    dynamicTyping:false,
-    skipEmptyLines:true,
-    complete: volData => {
-
-      ingestVolumenes(volData.data);
-
-      // 2. Cargar distritos
-      fetch(GEOJSON_URL)
-        .then(r => r.json())
-        .then(geo => {
-
-          // normalizar estructura
-          areaFeatures = (geo && geo.type === "FeatureCollection")
-            ? geo
-            : { type:"FeatureCollection", features:[geo] };
-
-          areaFeatures.features.forEach((f,i)=>{
-            if(!f.properties) f.properties = {};
-            f.properties.__idx = i;
-          });
-
-          boundaryLayer.addData(areaFeatures);
-
-          // zoom base
-          try{
-            const b = boundaryLayer.getBounds();
-            if(b && b.isValid()) map.fitBounds(b.pad(0.05));
-          }catch(e){}
-
-          // 3. Cargar CSV principal
-          Papa.parse(CSV_URL,{
-            download:true,
-            dynamicTyping:false,
-            skipEmptyLines:true,
-            complete: results => {
-              ingestRows(results.data);
-
-              // Aquí NO renderizamos aún, se hace luego de generar particiones
-            },
-            error: err => {
-              alert("Error al cargar CSV principal");
-            }
-          });
-
-        })
-        .catch(err=>{
-          alert("Error al cargar GeoJSON");
-        });
-
-    },
-    error: err=>{
-      alert("No se pudo cargar Vol_Prom.csv");
-    }
-  });
-}
-
-// Ejecutar carga
-loadAll();
-
-/* FIN PARTE 2 / 6 */
-
- /* =====================================
-   DETECCIÓN AUTOMÁTICA DE CONTIGÜIDAD
-   (Matriz de vecinos por distrito)
-=====================================*/
-
-function computeContiguity(){
-
-  if(!areaFeatures || !areaFeatures.features) return;
-
-  const feats = areaFeatures.features;
-  const N = feats.length;
-
-  // Inicializar lista vacía
-  for(let i=0; i<N; i++){
-    neighbors[i] = [];
-  }
-
-  // Comparar todos contra todos (N≈43 → rápido)
-  for(let i=0; i<N; i++){
-    for(let j=i+1; j<N; j++){
-
-      try{
-        const fA = feats[i];
-        const fB = feats[j];
-
-        // Determina si comparten frontera o punto
-        if(turf.booleanIntersects(fA, fB)){
-          neighbors[i].push(j);
-          neighbors[j].push(i);
-        }
-
-      }catch(e){
-        // Si falla el check de intersección, ignorar el par
-      }
-
-    }
-  }
-
-  // Quitar duplicados
-  for(let i=0; i<N; i++){
-    neighbors[i] = Array.from(new Set(neighbors[i]));
-  }
-}
-
-/* =====================================
-   getContainingFeature (incluído aquí
-   para consistencia y referencia)
-=====================================*/
-function getContainingFeature(lat, lon){
-  if(!areaFeatures) return null;
-
-  const pt = turf.point([lon, lat]);
-  const feats = areaFeatures.features ?? [];
-
-  for(let i=0; i<feats.length; i++){
-    if(turf.booleanPointInPolygon(pt, feats[i])){
-      return { idx:i, name:getFeatureDistName(feats[i]) };
-    }
-  }
-  return null;
-}
-
-/* =====================================
-   LLAMADA DESPUÉS DE CARGAR GEOJSON
-=====================================*/
-function afterGeoJSONLoaded(){
-  computeContiguity();
-}
-
-/* === FIN PARTE 3 / 6 === */
-
- /* =====================================================
-   PARTICIÓN POR CLIENTES (A/B/C clásica)
-   Mantiene el comportamiento original del proyecto.
-======================================================*/
-
-let featurePartByIdx_clientes = new Map();
-
+/* SECTION: Assign Proposal by Clients */
 function assignBalancedParts_Clientes(){
+  if(!records.length) return;
 
-  if(!records || !records.length) return;
-
-  // 1. Ordenar clientes por longitud (este criterio es el original)
-  const sorted = [...records].sort((a,b)=> a.lon - b.lon);
-
+  const sorted = [...records].sort((a,b)=>a.lon - b.lon);
   const n = sorted.length;
-  const size = Math.ceil(n / 3);
-  const cut1 = size;
-  const cut2 = size * 2;
+  const size = Math.ceil(n/3);
 
-  // 2. Asignar parte A/B/C
-  for(let i=0; i<n; i++){
+  for(let i=0;i<n;i++){
     const r = sorted[i];
-
-    if(i < cut1)       r.part = "A";
-    else if(i < cut2)  r.part = "B";
-    else               r.part = "C";
-
-    r.proposedDays      = partToDays[r.part];
-    r.proposedLetters   = partToFreqLetters[r.part];
+    r.partClie = (i < size) ? "A" : (i < size*2 ? "B" : "C");
+    r.proposedClieDays    = partToDays[r.partClie];
+    r.proposedClieLetters = partToFreqLetters[r.partClie];
   }
 
-  // 3. Determinar la parte dominante en cada distrito
   const byFeat = new Map();
-
   for(const r of records){
-    const f = r.featIdx;
-    if(f == null) continue;
-
-    if(!byFeat.has(f)) byFeat.set(f, {A:0, B:0, C:0});
-    byFeat.get(f)[r.part]++;
+    if(r.featIdx == null) continue;
+    if(!byFeat.has(r.featIdx)) byFeat.set(r.featIdx,{A:0,B:0,C:0});
+    byFeat.get(r.featIdx)[r.partClie]++;
   }
 
-  // 4. Asignar parte dominante a cada distrito
-  featurePartByIdx_clientes = new Map();
-
-  for(const [featIdx, counts] of byFeat){
-    let maj = "A";
-    let max = -1;
-
+  featurePart_Clientes = new Map();
+  for(const [idx,c] of byFeat){
+    let best="A", max=-1;
     for(const p of ["A","B","C"]){
-      if(counts[p] > max){
-        max = counts[p];
-        maj = p;
+      if(c[p] > max){
+        max=c[p];
+        best=p;
       }
     }
-
-    featurePartByIdx_clientes.set(featIdx, maj);
+    featurePart_Clientes.set(idx,best);
   }
 
-  // 5. Reasignar clientes a la parte dominante del distrito
   for(const r of records){
-    const dom = featurePartByIdx_clientes.get(r.featIdx);
-    if(dom && r.part !== dom){
-      r.part = dom;
-      r.proposedDays    = partToDays[dom];
-      r.proposedLetters = partToFreqLetters[dom];
+    const p = featurePart_Clientes.get(r.featIdx);
+    if(p && r.partClie !== p){
+      r.partClie = p;
+      r.proposedClieDays    = partToDays[p];
+      r.proposedClieLetters = partToFreqLetters[p];
     }
   }
 }
 
-/* === FIN PARTE 4 / 6 === */
+<!-- FIN PARTE 5/20 -->
 
- /* ============================================================
-   PARTICIÓN CONTIGUA EQUILIBRADA POR VOLUMEN (C‑1 ±12%)
-   - Mueve distritos completos
-   - Mantiene contigüidad geográfica
-   - Respeta forma original de zonas
-   - Aplica tolerancia ±12%
-============================================================*/
+<!-- INICIO PARTE 6/20 -->
 
-let featurePartByIdx_volumen = new Map();
-
-function assignBalancedParts_Volumen(){
-
-  if(!records.length) return;
-  if(!areaFeatures) return;
-  if(!neighbors) return;
+/* SECTION: Assign Proposal by KG (contiguous & balanced) */
+function assignBalancedParts_Kg(){
+  if(!records.length || !areaFeatures) return;
 
   const feats = areaFeatures.features;
   const N = feats.length;
 
-  /* ============================================================
-     1) Cálculo de volumen total por distrito
-  ============================================================*/
-  const volPorDistrito = Array(N).fill(0);
-
+  /* Volumen por distrito */
+  const volPerDist = Array(N).fill(0);
   for(const r of records){
     if(r.featIdx != null){
-      volPorDistrito[r.featIdx] += (r.volume ?? 0);
+      volPerDist[r.featIdx] += (r.volume ?? 0);
     }
   }
 
-  /* ============================================================
-     2) Partición inicial por volumen (greedy, sin contigüidad)
-  ============================================================*/
-  let cargaA = 0, cargaB = 0, cargaC = 0;
-  let distritoPart = Array(N).fill(null);
-
-  // Ordenar distritos por su centroide en X (lon)
-  const orderedFeats = [...Array(N).keys()].sort((i,j)=>{
-    const cA = feats[i].geometry;
-    const cB = feats[j].geometry;
-
+  /* Orden preliminar por centroide */
+  const ordered = [...Array(N).keys()].sort((i,j)=>{
     const lonA = turf.centroid(feats[i]).geometry.coordinates[0];
     const lonB = turf.centroid(feats[j]).geometry.coordinates[0];
     return lonA - lonB;
   });
 
-  // Asignación greedy
-  for(const idx of orderedFeats){
-    const v = volPorDistrito[idx];
-    if(cargaA <= cargaB && cargaA <= cargaC){
-      distritoPart[idx] = "A"; cargaA += v;
-    } else if(cargaB <= cargaA && cargaB <= cargaC){
-      distritoPart[idx] = "B"; cargaB += v;
-    } else {
-      distritoPart[idx] = "C"; cargaC += v;
-    }
+  /* Greedy inicial */
+  let A=0,B=0,C=0;
+  const distPart = Array(N).fill(null);
+
+  for(const idx of ordered){
+    const v = volPerDist[idx];
+    if(A <= B && A <= C){ distPart[idx]="A"; A+=v; }
+    else if(B <= A && B <= C){ distPart[idx]="B"; B+=v; }
+    else { distPart[idx]="C"; C+=v; }
   }
 
-  /* ============================================================
-     3) Función auxiliar: verificar contigüidad
-     Verifica que cada parte siga siendo un conjunto conectado.
-  ============================================================*/
-  function isContiguous(partLabel){
-
-    const assigned = [];
-    for(let i=0; i<N; i++){
-      if(distritoPart[i] === partLabel) assigned.push(i);
+  /* Contigüidad */
+  function isContiguous(label){
+    const nodes = [];
+    for(let i=0;i<N;i++){
+      if(distPart[i] === label) nodes.push(i);
     }
-    if(assigned.length <= 1) return true;
+    if(nodes.length <= 1) return true;
 
-    const visited = new Set();
-    const queue = [assigned[0]];
-    visited.add(assigned[0]);
+    const visited = new Set([nodes[0]]);
+    const queue = [nodes[0]];
 
     while(queue.length){
-      const cur = queue.shift();
-      for(const nb of neighbors[cur]){
-        if(distritoPart[nb] === partLabel && !visited.has(nb)){
+      const c = queue.shift();
+      for(const nb of neighbors[c]){
+        if(distPart[nb] === label && !visited.has(nb)){
           visited.add(nb);
           queue.push(nb);
         }
       }
     }
 
-    return visited.size === assigned.length;
+    return visited.size === nodes.length;
   }
 
-  /* ============================================================
-     4) Intento de equilibrio C‑1 (±12%)
-     - Mover distritos frontera si reduce desequilibrio
-     - Mantener contigüidad
-  ============================================================*/
-  function totalLoads(){
-    let cA=0, cB=0, cC=0;
-    for(let i=0;i<N;i++){
-      if(distritoPart[i]==="A") cA+=volPorDistrito[i];
-      if(distritoPart[i]==="B") cB+=volPorDistrito[i];
-      if(distritoPart[i]==="C") cC+=volPorDistrito[i];
-    }
-    return {A:cA, B:cB, C:cC};
+  function loads(){
+    return {
+      A: distPart.reduce((s,p,i)=>p==="A"?s+volPerDist[i]:s,0),
+      B: distPart.reduce((s,p,i)=>p==="B"?s+volPerDist[i]:s,0),
+      C: distPart.reduce((s,p,i)=>p==="C"?s+volPerDist[i]:s,0)
+    };
   }
 
-  function diffMetric(L){
-    const arr=[L.A, L.B, L.C];
-    const max=Math.max(...arr);
-    const min=Math.min(...arr);
-    return max-min;
+  function diff(L){
+    return Math.max(L.A,L.B,L.C) - Math.min(L.A,L.B,L.C);
   }
 
-  // Tolerancia: diferencia máxima aceptable
-  function withinTolerance(L){
-    const arr=[L.A, L.B, L.C];
-    const avg = (L.A + L.B + L.C)/3;
-    const maxD = avg * 0.12;
-    return (Math.max(...arr) - Math.min(...arr)) <= maxD;
+  function within(L){
+    const avg = (L.A+L.B+L.C)/3;
+    return diff(L) <= avg * 0.12;
   }
 
-  // Ajuste iterativo
+  /* Rebalance */
   let improving = true;
-
   while(improving){
     improving = false;
+    const L = loads();
+    if(within(L)) break;
 
-    const L = totalLoads();
-    if(withinTolerance(L)) break;
+    let big="A";
+    if(L.B > L[big]) big="B";
+    if(L.C > L[big]) big="C";
 
-    // Parte más cargada
-    let mayor = "A";
-    if(L.B > L[mayor]) mayor = "B";
-    if(L.C > L[mayor]) mayor = "C";
-
-    // Distritos frontera de esa parte
     const front = [];
-    for(let i=0; i<N; i++){
-      if(distritoPart[i] !== mayor) continue;
+    for(let i=0;i<N;i++){
+      if(distPart[i] !== big) continue;
       for(const nb of neighbors[i]){
-        if(distritoPart[nb] !== mayor){
+        if(distPart[nb] !== big){
           front.push(i);
           break;
         }
       }
     }
 
-    // Intentar mover un distrito frontera al vecino menos cargado
     for(const d of front){
-
-      const v = volPorDistrito[d];
-
-      // Partes vecinas
+      const v = volPerDist[d];
       const neighParts = new Set();
       for(const nb of neighbors[d]){
-        if(distritoPart[nb] !== mayor){
-          neighParts.add(distritoPart[nb]);
+        if(distPart[nb] !== big){
+          neighParts.add(distPart[nb]);
         }
       }
 
       for(const np of neighParts){
-        const old = distritoPart[d];
-        distritoPart[d] = np;
+        const old = distPart[d];
+        distPart[d] = np;
 
-        // Verificar contigüidad
         if(!isContiguous(old) || !isContiguous(np)){
-          distritoPart[d] = old;
+          distPart[d] = old;
           continue;
         }
 
-        const newLoads = totalLoads();
-        if(diffMetric(newLoads) < diffMetric(L)){
+        const newL = loads();
+        if(diff(newL) < diff(L)){
           improving = true;
           break;
         } else {
-          distritoPart[d] = old;
+          distPart[d] = old;
         }
       }
 
@@ -963,144 +793,125 @@ function assignBalancedParts_Volumen(){
     }
   }
 
-  /* ============================================================
-     5) Asignar r.partVolFinal a cada cliente
-  ============================================================*/
-  for(const r of records){
-    const d = r.featIdx;
-    const pv = distritoPart[d];
-    r.partVol = pv;
-    r.proposedVolDays    = partToDays[pv];
-    r.proposedVolLetters = partToFreqLetters[pv];
+  /* Asignar a clientes */
+  featurePart_Kg = new Map();
+  for(let i=0;i<N;i++){
+    featurePart_Kg.set(i, distPart[i]);
   }
 
-  /* ============================================================
-     6) Guardar parte final por distrito
-  ============================================================*/
-  featurePartByIdx_volumen = new Map();
-  for(let i=0;i<N;i++){
-    featurePartByIdx_volumen.set(i, distritoPart[i]);
+  for(const r of records){
+    const p = featurePart_Kg.get(r.featIdx);
+    r.partKg = p;
+    r.proposedKgDays    = partToDays[p];
+    r.proposedKgLetters = partToFreqLetters[p];
   }
 }
 
-/* === FIN PARTE 5 / 6 === */
+<!-- FIN PARTE 6/20 -->
 
- /* ============================================================
-   RENDER DE POPUP (actual + propuesta por clientes + volumen)
-============================================================*/
+<!-- INICIO PARTE 7/20 -->
 
+/* SECTION: Popup for Clients */
 function buildPopUp(r){
   const gm = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
 
-  const freqNow = r.freqLetters ?? "—";
-  const freqCli = r.proposedLetters ?? "—";
-  const freqVol = r.proposedVolLetters ?? "—";
+  const freqNow  = r.freqLetters ?? "—";
+  const freqClie = r.proposedClieLetters ?? "—";
+  const freqKg   = r.proposedKgLetters ?? "—";
 
-  const daysCli = (r.proposedDays ?? []).join(", ");
-  const daysVol = (r.proposedVolDays ?? []).join(", ");
-
-  const dist = r.geoDistName ?? r.distrito ?? "—";
+  const daysClie = (r.proposedClieDays ?? []).join(", ");
+  const daysKg   = (r.proposedKgDays ?? []).join(", ");
 
   return `
-    <div style="min-width:260px; line-height:1.28;">
+    <div style="min-width:260px;">
       <div class="popup-line" style="font-weight:700; font-size:14px;">
         Cliente: ${escapeHtml(r.code)}
       </div>
 
       <div class="popup-line"><strong>Nombre:</strong> ${escapeHtml(r.name)}</div>
       <div class="popup-line"><strong>Canal:</strong> ${escapeHtml(r.canal)}</div>
-      <div class="popup-line"><strong>Distrito:</strong> ${escapeHtml(dist)}</div>
+      <div class="popup-line"><strong>Distrito:</strong> ${escapeHtml(r.geoDistName)}</div>
       <div class="popup-line"><strong>Oficina:</strong> ${escapeHtml(r.office)}</div>
+      <div class="popup-line"><strong>Kg/día:</strong> ${compactNumber(r.volume ?? 0)}</div>
 
-      <div class="popup-line"><strong>Volumen prom (kg/día):</strong> ${compactNumber(r.volume ?? 0)}</div>
+      <hr style="border:none;border-top:1px solid #1f2937;margin:6px 0;">
 
-      <hr style="border:none;border-top:1px solid #1f2937; margin:6px 0;" />
+      <div class="popup-line"><strong>Actual:</strong> <span class="freq">${freqNow}</span></div>
 
-      <div class="popup-line"><strong>Frecuencia actual:</strong> <span class="freq">${freqNow}</span></div>
-
-      <div class="popup-line"><strong>Propuesta clientes:</strong>
-        <span class="freq">${freqCli}</span>
-        <span class="popup-muted">(${daysCli})</span>
+      <div class="popup-line">
+        <strong>Prop Clie:</strong>
+        <span class="freq">${freqClie}</span>
+        <span class="popup-muted">(${daysClie})</span>
       </div>
 
-      <div class="popup-line"><strong>Propuesta volumen:</strong>
-        <span class="freq">${freqVol}</span>
-        <span class="popup-muted">(${daysVol})</span>
+      <div class="popup-line">
+        <strong>Prop Kg:</strong>
+        <span class="freq">${freqKg}</span>
+        <span class="popup-muted">(${daysKg})</span>
       </div>
 
       <div class="popup-line" style="margin-top:6px;">
-        ${gm}Abrir en Google Maps ↗</a>
+        ${gm}
       </div>
     </div>
   `;
 }
 
-
-/* ============================================================
-   RESUMEN DISTRITO (para popup al hacer click en polígono)
-============================================================*/
-
+/* SECTION: District Summary Popup */
 function summarizeDistrict(idx){
-
-  const useAte = filterOffices.has("OFIC ATE");
+  const useAte    = filterOffices.has("OFIC ATE");
   const useChorri = filterOffices.has("OFIC CHORRILLOS");
 
-  function validOffice(o){
-    return (o==="OFIC ATE" && useAte) || (o==="OFIC CHORRILLOS" && useChorri);
-  }
+  const validOffice = o =>
+    (o==="OFIC ATE" && useAte) ||
+    (o==="OFIC CHORRILLOS" && useChorri);
 
   const out = { total:0, A:0, B:0, C:0, carga:0 };
 
   for(const r of records){
+
     if(r.featIdx !== idx) continue;
     if(!validOffice(normalize(r.office))) continue;
     if(selectedCanal!=="Todos" && normalize(r.canal)!==normalize(selectedCanal)) continue;
     if(filterZ3 && !r.hadZ3) continue;
 
-    let pass = true;
+    let pass=true;
 
-    if(selectedDay!=="Todos"){
-      if(viewMode==="Actual"){
-        pass = r.days.includes(selectedDay);
-      } else {
-        pass = (partMode==="clientes"
-                ? (r.proposedDays ?? []).includes(selectedDay)
-                : (r.proposedVolDays ?? []).includes(selectedDay));
-      }
+    if(selectedDay !== "Todos"){
+      if(viewMode === "actual")        pass = r.days.includes(selectedDay);
+      else if(viewMode === "clie")     pass = (r.proposedClieDays ?? []).includes(selectedDay);
+      else if(viewMode === "kg")       pass = (r.proposedKgDays ?? []).includes(selectedDay);
     }
 
     if(!pass) continue;
 
     out.total++;
-    const p = (viewMode==="Actual")
-      ? null
-      : (partMode==="clientes" ? r.part : r.partVol);
+    const p = (viewMode==="actual") ? null :
+              (viewMode==="clie" ? r.partClie : r.partKg);
 
-    if(p && out[p]!==undefined) out[p]++;
+    if(p && out[p] !== undefined) out[p]++;
     out.carga += (r.volume ?? 0);
   }
 
   return out;
 }
 
+<!-- FIN PARTE 7/20 -->
 
-/* ============================================================
-   LEYENDA (incluye volúmenes en formato compacto)
-============================================================*/
+<!-- INICIO PARTE 8/20 -->
 
+/* SECTION: Legend Rendering */
 function renderLegend(){
-
   const legend = document.getElementById("legend");
-
-  const channelCounts = {};
+  const channelCounts  = {};
   const channelVolumes = {};
 
-  const useAte = filterOffices.has("OFIC ATE");
+  const useAte    = filterOffices.has("OFIC ATE");
   const useChorri = filterOffices.has("OFIC CHORRILLOS");
 
-  function validOffice(o){
-    return (o==="OFIC ATE" && useAte) || (o==="OFIC CHORRILLOS" && useChorri);
-  }
+  const validOffice = o =>
+    (o==="OFIC ATE" && useAte) ||
+    (o==="OFIC CHORRILLOS" && useChorri);
 
   for(const r of records){
 
@@ -1110,198 +921,173 @@ function renderLegend(){
 
     let pass = true;
 
-    if(selectedDay!=="Todos"){
-      if(viewMode==="Actual"){
-        pass = r.days.includes(selectedDay);
-      } else {
-        pass = (partMode==="clientes"
-                ? (r.proposedDays ?? []).includes(selectedDay)
-                : (r.proposedVolDays ?? []).includes(selectedDay));
-      }
+    if(selectedDay !== "Todos"){
+      if(viewMode === "actual")        pass = r.days.includes(selectedDay);
+      else if(viewMode === "clie")     pass = (r.proposedClieDays ?? []).includes(selectedDay);
+      else if(viewMode === "kg")       pass = (r.proposedKgDays ?? []).includes(selectedDay);
     }
+
     if(!pass) continue;
 
-    const c = r.canal ?? "Sin canal";
-    channelCounts[c] = (channelCounts[c] ?? 0) + 1;
+    const c = r.canal || "Sin canal";
+    channelCounts[c]  = (channelCounts[c]  ?? 0) + 1;
     channelVolumes[c] = (channelVolumes[c] ?? 0) + (r.volume ?? 0);
   }
 
   const header =
-    viewMode==="Actual"
-      ? "🎯 Atención actual"
-      : (partMode==="clientes"
-          ? "🧭 Propuesta A/B/C (Clientes)"
-          : "⚖️ Propuesta A/B/C (Volumen)");
+    viewMode === "actual" ? "🎯 Actual" :
+    viewMode === "clie"   ? "🧭 Prop Clie" :
+                            "⚖️ Prop Kg";
 
   let html = `<h4>${header}</h4>`;
   html += `<div>${selectedDay} · Canal: ${escapeHtml(selectedCanal)}</div>`;
-
-  html += `<div style="margin-top:8px; color:#9fb0c3;">Canales visibles</div>`;
+  html += `<div style="margin-top:6px;color:#9fb0c3;">Canales visibles</div>`;
 
   const keys = Object.keys(channelCounts).sort();
-  if(keys.length===0){
+  if(keys.length === 0){
     html += `<div class="row" style="color:#9fb0c3;">(Sin datos)</div>`;
   } else {
     for(const k of keys){
-      const color = colorForChannel(k);
+      const clr = colorForChannel(k);
       html += `
         <div class="row">
-          <span class="swatch" style="background:${color}"></span>
+          <span class="swatch" style="background:${clr}"></span>
           ${escapeHtml(k)}
-          <span class="pill">${channelCounts[k]} cl · ${compactNumber(channelVolumes[k])} kg</span>
-        </div>
-      `;
+          <span class="pill">${channelCounts[k]} · ${compactNumber(channelVolumes[k])} kg</span>
+        </div>`;
     }
   }
 
   legend.innerHTML = html;
 }
 
-
-/* ============================================================
-   RENDER DISTRITOS (colores sólidos A/B/C y popups)
-============================================================*/
-
-function renderDistrictsColored(){
-
-  districtsLayerHolder.clearLayers();
+/* SECTION: Draw District Polygons */
+function renderDistricts(){
+  districtsLayer.clearLayers();
   if(!areaFeatures) return;
 
   const layer = L.geoJSON(areaFeatures,{
-    pane:"zonesPane",
-    style: f =>{
-      const idx = f.properties.__idx;
 
+    pane:"zonesPane",
+
+    style: f => {
+      const idx = f.properties.__idx;
       let p = null;
-      if(viewMode==="Actual"){
-        // no coloreamos por parte en Actual
-        return {color:"#ef4444", weight:1, fillOpacity:0};
-      } else {
-        p = (partMode==="clientes"
-              ? featurePartByIdx_clientes.get(idx)
-              : featurePartByIdx_volumen.get(idx));
+
+      if(viewMode === "actual"){
+        return { color:"#ef4444", weight:1, fillOpacity:0 };
       }
+
+      p = (viewMode==="clie")
+          ? featurePart_Clientes.get(idx)
+          : featurePart_Kg.get(idx);
 
       if(!p){
-        return {color:"#ef4444", weight:1, fillOpacity:0};
+        return { color:"#ef4444", weight:1, fillOpacity:0 };
       }
 
-      const fill = partFill[p];
-      const stroke = "#00000055";
-
       return {
-        fillColor: fill,
-        fillOpacity: 0.45,
-        color: stroke,
-        weight: 2
+        fillColor: partFill[p],
+        fillOpacity: 0.38,
+        color:"#00000050",
+        weight:1.4
       };
     },
 
-    onEachFeature: (f, polyLayer)=>{
+    onEachFeature:(f,poly)=>{
       const idx = f.properties.__idx;
       const name = getFeatureDistName(f);
 
-      polyLayer.bindTooltip(name, {direction:"auto", sticky:true});
+      poly.bindTooltip(name,{direction:"auto",sticky:true});
 
-      polyLayer.on("click", e=>{
-        const sum = summarizeDistrict(idx);
-        const html = `
-          <div style="min-width:220px;">
-            <div style="font-weight:700; margin-bottom:6px;">
-              ${escapeHtml(name)}
-            </div>
-
-            <div>Total visibles: <strong>${sum.total}</strong></div>
-            <div>A: <strong>${sum.A}</strong> · B: <strong>${sum.B}</strong> · C: <strong>${sum.C}</strong></div>
-            <div>Carga total: <strong>${compactNumber(sum.carga)} kg</strong></div>
+      poly.on("click",e=>{
+        const s = summarizeDistrict(idx);
+        const h = `
+          <div style="min-width:200px;">
+            <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(name)}</div>
+            <div>Total: <strong>${s.total}</strong></div>
+            <div>A: <strong>${s.A}</strong> · B: <strong>${s.B}</strong> · C: <strong>${s.C}</strong></div>
+            <div>Kg: <strong>${compactNumber(s.carga)}</strong></div>
           </div>
         `;
-        L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+        L.popup().setLatLng(e.latlng).setContent(h).openOn(map);
       });
     }
   });
 
-  layer.addTo(districtsLayerHolder);
+  layer.addTo(districtsLayer);
 }
 
-
-/* ============================================================
-   RENDER MARCADORES
-============================================================*/
-
-function refreshLayers(){
-
+/* SECTION: Draw Markers */
+function refreshMarkers(){
   currentLayer.clearLayers();
-  proposedLayer.clearLayers();
+  propuestaClie.clearLayers();
+  propuestaKg.clearLayers();
 
-  const useAte = filterOffices.has("OFIC ATE");
+  const useAte    = filterOffices.has("OFIC ATE");
   const useChorri = filterOffices.has("OFIC CHORRILLOS");
 
-  function validOffice(o){
-    return (o==="OFIC ATE" && useAte) || (o==="OFIC CHORRILLOS" && useChorri);
-  }
+  const validOffice = o =>
+    (o==="OFIC ATE" && useAte) ||
+    (o==="OFIC CHORRILLOS" && useChorri);
 
-  if(showMarkers){
+  for(const r of records){
 
-    for(const r of records){
+    if(!validOffice(normalize(r.office))) continue;
+    if(selectedCanal!=="Todos" && normalize(r.canal)!==normalize(selectedCanal)) continue;
+    if(filterZ3 && !r.hadZ3) continue;
 
-      if(!validOffice(normalize(r.office))) continue;
-      if(selectedCanal!=="Todos" && normalize(r.canal)!==normalize(selectedCanal)) continue;
-      if(filterZ3 && !r.hadZ3) continue;
-
-      let pass = true;
-
-      if(selectedDay!=="Todos"){
-        if(viewMode==="Actual"){
-          pass = r.days.includes(selectedDay);
-        } else {
-          pass = (partMode==="clientes"
-                  ? (r.proposedDays ?? []).includes(selectedDay)
-                  : (r.proposedVolDays ?? []).includes(selectedDay));
-        }
-      }
-      if(!pass) continue;
-
-      const marker = L.circleMarker([r.lat,r.lon],{
-        pane:"markersPane",
-        radius:5.6,
-        color:"#0b1221",
-        weight:1,
-        fillColor: colorForChannel(r.canal ?? ""),
-        fillOpacity:0.95
-      }).bindPopup(buildPopUp(r));
-
-      if(viewMode==="Actual"){
-        currentLayer.addLayer(marker);
-      } else {
-        proposedLayer.addLayer(marker);
-      }
+    let pass=true;
+    if(selectedDay !== "Todos"){
+      if(viewMode==="actual") pass = r.days.includes(selectedDay);
+      else if(viewMode==="clie") pass = (r.proposedClieDays ?? []).includes(selectedDay);
+      else pass = (r.proposedKgDays ?? []).includes(selectedDay);
     }
-  }
+    if(!pass) continue;
 
-  if(viewMode==="Actual"){
-    if(!map.hasLayer(currentLayer)) map.addLayer(currentLayer);
-    if(map.hasLayer(proposedLayer)) map.removeLayer(proposedLayer);
-  } else {
-    if(!map.hasLayer(proposedLayer)) map.addLayer(proposedLayer);
-    if(map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
-  }
+    if(!showMarkers) continue;
 
-  renderDistrictsColored();
+    const mk = L.circleMarker([r.lat,r.lon],{
+      pane:"markersPane",
+      radius:5.4,
+      color:"#0b1221",
+      weight:1,
+      fillColor:colorForChannel(r.canal),
+      fillOpacity:0.95
+    }).bindPopup(buildPopUp(r));
+
+    if(viewMode==="actual") currentLayer.addLayer(mk);
+    else if(viewMode==="clie") propuestaClie.addLayer(mk);
+    else propuestaKg.addLayer(mk);
+  }
+}
+
+<!-- FIN PARTE 8/20 -->
+
+<!-- INICIO PARTE 9/20 -->
+
+/* SECTION: Full Layer Refresh */
+function refreshLayers(){
+  refreshMarkers();
+  renderDistricts();
   renderLegend();
   fitToContent();
 }
 
-
-/* ============================================================
-   AJUSTAR VISTA DE MAPA
-============================================================*/
-
+/* SECTION: Fit Map to Visible Content */
 function fitToContent(){
   let bounds = null;
-  const layers = [currentLayer, proposedLayer, boundaryLayer, districtsLayerHolder];
+
+  const layers = [
+    currentLayer,
+    propuestaClie,
+    propuestaKg,
+    boundaryLayer,
+    districtsLayer
+  ];
 
   for(const LYR of layers){
+    if(!map.hasLayer(LYR)) continue;
     const b = LYR.getBounds?.();
     if(b && b.isValid()){
       bounds = bounds ? bounds.extend(b) : b;
@@ -1315,20 +1101,21 @@ function fitToContent(){
   }
 }
 
+/* SECTION: CSV Export */
+function csvEscape(v){
+  const s = (v ?? "").toString();
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+}
 
-/* ============================================================
-   EXPORT CSV
-============================================================*/
+function getFilteredRowsForExport(){
+  const out = [];
 
-function getFilteredRows(){
-  const useAte = filterOffices.has("OFIC ATE");
+  const useAte    = filterOffices.has("OFIC ATE");
   const useChorri = filterOffices.has("OFIC CHORRILLOS");
 
-  function validOffice(o){
-    return (o==="OFIC ATE" && useAte) || (o==="OFIC CHORRILLOS" && useChorri);
-  }
-
-  const out = [];
+  const validOffice = o =>
+    (o==="OFIC ATE" && useAte) ||
+    (o==="OFIC CHORRILLOS" && useChorri);
 
   for(const r of records){
 
@@ -1337,13 +1124,12 @@ function getFilteredRows(){
     if(filterZ3 && !r.hadZ3) continue;
 
     let pass = true;
-    if(selectedDay!=="Todos"){
-      pass = (viewMode==="Actual"
-              ? r.days.includes(selectedDay)
-              : (partMode==="clientes"
-                  ? (r.proposedDays ?? []).includes(selectedDay)
-                  : (r.proposedVolDays ?? []).includes(selectedDay)));
+    if(selectedDay !== "Todos"){
+      if(viewMode==="actual")      pass = r.days.includes(selectedDay);
+      else if(viewMode==="clie")   pass = (r.proposedClieDays ?? []).includes(selectedDay);
+      else                         pass = (r.proposedKgDays ?? []).includes(selectedDay);
     }
+
     if(!pass) continue;
 
     out.push(r);
@@ -1352,20 +1138,12 @@ function getFilteredRows(){
   return out;
 }
 
-function csvEscape(v){
-  const s=(v??"").toString();
-  if(/[",\r\n]/.test(s)){
-    return `"${s.replace(/"/g,'""')}"`;
-  }
-  return s;
-}
-
 document.getElementById("exportBtn").addEventListener("click",()=>{
+  const rows = getFilteredRowsForExport();
 
-  const rows = getFilteredRows();
   const header = [
     "Codigo","Nombre","Distrito_CSV","Distrito_Geo",
-    "Freq_Actual","Prop_Clientes","Prop_Volumen",
+    "Freq_Actual","Prop_Clie","Prop_Kg",
     "Canal","Lat","Lon","Oficina","Vol_kg"
   ];
 
@@ -1375,59 +1153,66 @@ document.getElementById("exportBtn").addEventListener("click",()=>{
       r.name,
       r.distrito,
       r.geoDistName,
-      r.freqLetters ?? "",
-      r.proposedLetters ?? "",
-      r.proposedVolLetters ?? "",
-      r.canal ?? "",
+      r.freqLetters,
+      r.proposedClieLetters ?? "",
+      r.proposedKgLetters ?? "",
+      r.canal,
       r.lat,
       r.lon,
-      r.office ?? "",
+      r.office,
       r.volume ?? 0
     ].map(csvEscape).join(","))
   ).join("\r\n");
 
   const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"});
   const url  = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  const a    = document.createElement("a");
+
   a.href = url;
-  a.download = "ATEII_export.csv";
+  a.download = "ATEII_2026_export.csv";
   a.click();
+
   URL.revokeObjectURL(url);
 });
 
+<!-- FIN PARTE 9/20 -->
 
-/* ============================================================
-   EVENTOS UI
-============================================================*/
+<!-- INICIO PARTE 10/20 -->
 
-document.getElementById("viewToggle").addEventListener("change", e=>{
-  viewMode = e.target.checked ? "Propuesta" : "Actual";
-  refreshLayers();
+/* SECTION: Mode Switch (Actual / Clie / Kg) */
+document.querySelectorAll(".mode-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+
+    document.querySelectorAll(".mode-btn")
+      .forEach(b=>b.classList.remove("active"));
+
+    btn.classList.add("active");
+    viewMode = btn.dataset.mode;
+
+    refreshLayers();
+  });
 });
 
+/* SECTION: Day Filter */
 document.getElementById("dayFilter").addEventListener("click", e=>{
-  if(e.target.tagName==="BUTTON"){
-    document.querySelectorAll("#dayFilter button").forEach(btn=>btn.classList.remove("active"));
+  if(e.target.tagName === "BUTTON"){
+    document.querySelectorAll("#dayFilter button")
+      .forEach(b=>b.classList.remove("active"));
+
     e.target.classList.add("active");
     selectedDay = e.target.dataset.day;
+
     refreshLayers();
   }
 });
 
-document.getElementById("partChoice").addEventListener("click", e=>{
-  if(e.target.tagName==="BUTTON"){
-    document.querySelectorAll("#partChoice button").forEach(btn=>btn.classList.remove("active"));
-    e.target.classList.add("active");
-    partMode = e.target.dataset.mode;
-    refreshLayers();
-  }
-});
-
+/* SECTION: Canal Filter */
 document.getElementById("canalFilter").addEventListener("change", e=>{
   selectedCanal = e.target.value ?? "Todos";
   refreshLayers();
 });
 
+/* SECTION: Offices */
 document.getElementById("oficAte").addEventListener("change", e=>{
   if(e.target.checked) filterOffices.add("OFIC ATE");
   else filterOffices.delete("OFIC ATE");
@@ -1440,19 +1225,120 @@ document.getElementById("oficChorri").addEventListener("change", e=>{
   refreshLayers();
 });
 
+/* SECTION: Marker Toggle */
 document.getElementById("markersToggle").addEventListener("change", e=>{
   showMarkers = e.target.checked;
   refreshLayers();
 });
 
+/* SECTION: Z3 Toggle */
 document.getElementById("z3Toggle").addEventListener("change", e=>{
   filterZ3 = e.target.checked;
   refreshLayers();
 });
 
+/* SECTION: Load All (Volumen + Distritos + CSV) */
+function loadAll(){
 
-})(); // end IIFE
+  Papa.parse(VOL_URL,{
+    download:true,
+    skipEmptyLines:true,
+    complete:(volData)=>{
+
+      ingestVolumenes(volData.data);
+
+      fetch(GEOJSON_URL)
+        .then(r=>r.json())
+        .then(geo=>{
+
+          areaFeatures = (geo && geo.type==="FeatureCollection")
+            ? geo
+            : { type:"FeatureCollection", features:[geo] };
+
+          areaFeatures.features.forEach((f,i)=>{
+            if(!f.properties) f.properties = {};
+            f.properties.__idx = i;
+          });
+
+          boundaryLayer.addData(areaFeatures);
+
+          computeContiguity();
+
+          Papa.parse(CSV_URL,{
+            download:true,
+            skipEmptyLines:true,
+            complete:(cat)=>{
+              ingestRows(cat.data);
+            }
+          });
+
+        });
+    }
+  });
+}
+
+loadAll();
+
+<!-- FIN PARTE 10/20 -->
+
+<!-- INICIO PARTE 11/20 -->
+
+})();  <!-- cierre del IIFE principal -->
+
 </script>
 
+<!-- FIN PARTE 11/20 -->
+
+<!-- INICIO PARTE 12/20 -->
+
+<!-- SECTION: Document End -->
 </body>
-</html>
+
+<!-- INICIO PARTE 13/20 -->
+
+<!-- EXTRA BLOCK 13 (vacío para extensiones futuras) -->
+
+<!-- FIN PARTE 13/20 -->
+
+<!-- INICIO PARTE 14/20 -->
+
+<!-- EXTRA BLOCK 14 (reservado para extensiones, notas o módulos futuros) -->
+
+<!-- FIN PARTE 14/20 -->
+
+<!-- INICIO PARTE 15/20 -->
+
+<!-- EXTRA BLOCK 15 (espacio reservado para notas internas o futuras funciones) -->
+
+<!-- FIN PARTE 15/20 -->
+
+<!-- INICIO PARTE 16/20 -->
+
+<!-- EXTRA BLOCK 16 (espacio reservado para futuras ampliaciones o etiquetas personalizadas) -->
+
+<!-- FIN PARTE 16/20 -->
+
+<!-- INICIO PARTE 17/20 -->
+
+<!-- EXTRA BLOCK 17 (espacio reservado para personalizaciones futuras) -->
+
+<!-- FIN PARTE 17/20 -->
+``
+<!-- INICIO PARTE 18/20 -->
+
+<!-- EXTRA BLOCK 18 (reservado para configuraciones o adiciones futuras) -->
+
+<!-- FIN PARTE 18/20 -->
+
+<!-- INICIO PARTE 19/20 -->
+
+<!-- EXTRA BLOCK 19 (espacio disponible para futuras ampliaciones del proyecto ATEII 2026) -->
+
+<!-- FIN PARTE 19/20 -->
+
+<!-- INICIO PARTE 20/20 -->
+
+<!-- EXTRA BLOCK 20 (cierre final del esquema de 20 partes) -->
+
+<!-- FIN PARTE 20/20 -->
+``
