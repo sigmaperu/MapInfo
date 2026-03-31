@@ -71,7 +71,7 @@
   position:absolute; bottom:12px; left:12px; z-index:600; background:var(--md-surface);
   border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width:430px; box-shadow:var(--elev);
  }
- .legend h4{ margin:0 0 6px 0; font-size:12px; }
+ .legend h4{ margin:0 0 4px 0; font-size:12px; }
  .legend .row{ display:flex; align-items:center; gap:6px; margin:4px 0; flex-wrap:wrap;}
  .swatch{ width:12px; height:12px; border-radius:2px; border:1px solid #0003; }
  .pill{ font-size:10px; padding:2px 6px; border:1px solid var(--md-outline); border-radius:999px; color:var(--md-muted); background:var(--chip-bg);} 
@@ -91,10 +91,9 @@
 <header>
   <div style="display:flex; flex-direction:column; gap:2px;">
     <h1>ATEII · Mapa de atención</h1>
-    <div class="muted">CSV: Catálogo Sigma + Volumen · GeoJSON: distritos (RoadMap)</div>
+    <div class="muted">CSV: Catálogo Sigma + Volumen · GeoJSON distritos</div>
   </div>
   <div class="controls">
-    <!-- Vistas: Actual / Prop. Clie / Prop. Kg -->
     <div class="group">
       <strong style="font-size:11px;">Vista:</strong>
       <div id="viewTabs" class="segmented" role="tablist" aria-label="Vista">
@@ -103,7 +102,6 @@
         <button data-view="PropKg">Prop. Kg</button>
       </div>
     </div>
-    <!-- Día -->
     <div class="group">
       <strong style="font-size:11px;">Día:</strong>
       <div id="dayFilter" class="segmented" role="tablist" aria-label="Filtro de día">
@@ -116,20 +114,17 @@
         <button data-day="Sábado">S</button>
       </div>
     </div>
-    <!-- Canal -->
     <div class="group">
       <strong style="font-size:11px;">Canal:</strong>
       <select id="canalFilter" class="select" title="Filtrar por canal">
         <option value="Todos">Todos</option>
       </select>
     </div>
-    <!-- Oficinas -->
     <div class="group">
       <strong style="font-size:11px;">Oficina:</strong>
       <label><input type="checkbox" id="oficAte" checked> <span class="pill">Ofic Ate</span></label>
       <label><input type="checkbox" id="oficChorri" checked> <span class="pill">Ofic Chorrillos</span></label>
     </div>
-    <!-- Marcadores -->
     <div class="group">
       <label class="switch" title="Mostrar/Ocultar marcadores">
         <span>Marcadores</span>
@@ -137,15 +132,13 @@
         <span class="toggle"><span class="knob"></span></span>
       </label>
     </div>
-    <!-- +Z3 -->
-    <div class="group" title="Mostrar solo clientes que tenían más de 2 días actuales (Actual y Propuestas)">
+    <div class="group" title="Mostrar solo clientes con más de 2 días actuales">
       <label class="switch">
         <span>+Z3</span>
         <input id="z3Toggle" class="toggle-input" type="checkbox"/>
         <span class="toggle"><span class="knob"></span></span>
       </label>
     </div>
-    <!-- Export -->
     <div class="group">
       <button id="exportBtn" class="btn" title="Exportar CSV (respeta filtros activos)">Exportar CSV</button>
     </div>
@@ -181,8 +174,7 @@
   const partColors = { "A":"#5a76ff", "B":"#30c48d", "C":"#a56cff" };
   const partFill = { "A":"#5a76ff", "B":"#30c48d", "C":"#a56cff" };
 
-  // Vista: "Actual" | "PropClie" | "PropKg"
-  let viewMode = "Actual";
+  let viewMode = "Actual"; // "Actual" | "PropClie" | "PropKg"
   let selectedDay = "Todos";
   let selectedCanal = "Todos";
   let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
@@ -195,34 +187,24 @@
   map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600;
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
   const currentLayer = L.layerGroup().addTo(map);
-  const proposedLayer = L.layerGroup(); // usamos este para ambas propuestas
+  const proposedLayer = L.layerGroup();
   const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
   const districtsLayerHolder = L.layerGroup().addTo(map);
 
   let areaFeatures = null;
-  let records = []; // cada record tiene ambas propuestas y kg
+  let records = [];
   let featurePartByIdxClie = new Map();
   let featurePartByIdxKg = new Map();
   let channelPalette = {};
   let kgByCode = new Map();
 
-  function normalize(s){  
-   try{    return (s ?? "")      
-   .toString()      
-   .normalize("NFD")      
-   .replace(/\p{Diacritic}/gu, "")      
-   .toUpperCase()      
-   .trim();  
-      }
-   catch(e){    
-    return (s ?? "")      
-     .toString()      
-     .toUpperCase()      
-     .trim();  
-   }
+  function normalize(s){
+    try { return (s ?? "").toString().normalize("NFD").replace(/p{Diacritic}/gu, "").toUpperCase().trim(); }
+    catch(e){ return (s ?? "").toString().toUpperCase().trim(); }
   }
   function normalizeName(s){ return normalize(s).replace(/s+/g,' '); }
   function num(s){ if (s == null) return NaN; const t = s.toString().replace(",", "."); const v = parseFloat(t); return Number.isFinite(v) ? v : NaN; }
+
   function hasHeader(row){
     const a = num(row[28]), b = num(row[29]);
     const t28 = (row[28] ?? "").toString().toLowerCase();
@@ -231,16 +213,19 @@
     if (t28.includes("lat") || t29.includes("lon")) return true;
     return false;
   }
+
   function parseDays(raw){
     const s = (raw ?? "").toString().toUpperCase().replace(/[^LMXJVS]/g,"");
     const set = new Set();
     for (const ch of s) if (dayLetterToName[ch]) set.add(dayLetterToName[ch]);
     return orderDays.filter(d => set.has(d));
   }
+
   function toFreqLetters(dayArr){
     return ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"]
       .map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
   }
+
   const DIST_KEYS = ["NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist","nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"];
   function getFeatureDistName(f){
     const p = f?.properties || {};
@@ -248,6 +233,7 @@
     for (const k in p){ if (typeof p[k] === "string" && p[k].trim().length) return p[k].trim(); }
     return "Distrito";
   }
+
   function getContainingFeature(lat, lon){
     if (!areaFeatures) return null;
     const pt = turf.point([lon, lat]);
@@ -258,6 +244,7 @@
     }
     return null;
   }
+
   const baseColors = ["#22c55e","#eab308","#06b6d4","#f97316","#a855f7","#ef4444","#14b8a6","#f43f5e","#84cc16","#e879f9","#60a5fa","#f59e0b","#10b981","#8b5cf6"];
   function colorForChannel(canal){
     if (!canal) return "#6b7280";
@@ -266,6 +253,7 @@
     const color = baseColors[h % baseColors.length];
     channelPalette[canal] = color; return color;
   }
+
   function escapeHtml(str) {
     return (str ?? "").toString()
       .replace(/&/g, "&amp;")
@@ -292,23 +280,26 @@
     const partSummary = partSummaryWithFilters();
     const daySummary = daySummaryWithFilters();
 
-    let header = "🎯 Atención actual";
-    if (viewMode === "PropClie") header = "🧭 Propuesta clientes (A/B/C)";
-    if (viewMode === "PropKg") header = "⚖️ Propuesta Kg (A/B/C)";
+    let header = "🎯 Atención actual (frecuencia real)";
+    if (viewMode === "PropClie") header = "🧭 Propuesta clientes (A/B/C por cantidad)";
+    if (viewMode === "PropKg") header = "⚖️ Propuesta Kg (A/B/C por volumen)";
     const z3 = (filterZ3) ? `<span class="pill">+Z3</span>` : ``;
 
     legendEl.innerHTML = `
       <h4>${header} ${z3}</h4>
-      <div class="row"><span class="pill">Día:</span> <span>${escapeHtml(selectedDay)}</span> <span class="pill">Canal:</span> <span>${escapeHtml(selectedCanal)}</span></div>
-      <div style="margin:6px 0 4px; color:#9fb0c3; font-size:12px;">Canales visibles (clientes · kg)</div>
+      <div class="row">
+        <span class="pill">Día filtro:</span> <span>${escapeHtml(selectedDay)}</span>
+        <span class="pill">Canal:</span> <span>${escapeHtml(selectedCanal)}</span>
+      </div>
+      <div style="margin:6px 0 4px; color:#9fb0c3; font-size:12px;">Canales visibles (clientes · kg, afectados por filtros)</div>
       ${items || '<div class="row" style="color:#9fb0c3;">(Sin datos)</div>'}
-      <div style="margin:8px 0 4px; color:#9fb0c3; font-size:12px;">Resumen por parte (clientes · kg)</div>
+      <div style="margin:8px 0 4px; color:#9fb0c3; font-size:12px;">Resumen por parte (clientes · kg, sin filtro de día)</div>
       <div class="row">
         A (LJ): <span class="pill">${partSummary.A.count}</span> <span class="pill">${partSummary.A.kg.toFixed(0)} kg</span>
         B (MV): <span class="pill">${partSummary.B.count}</span> <span class="pill">${partSummary.B.kg.toFixed(0)} kg</span>
         C (XS): <span class="pill">${partSummary.C.count}</span> <span class="pill">${partSummary.C.kg.toFixed(0)} kg</span>
       </div>
-      <div style="margin:8px 0 4px; color:#9fb0c3; font-size:12px;">Resumen por día (clientes · kg)</div>
+      <div style="margin:8px 0 4px; color:#9fb0c3; font-size:12px;">Resumen por día (clientes · kg, sin filtro de día)</div>
       <div class="row">
         L: <span class="pill">${daySummary.L.count}</span> <span class="pill">${daySummary.L.kg.toFixed(0)} kg</span>
         M: <span class="pill">${daySummary.M.count}</span> <span class="pill">${daySummary.M.kg.toFixed(0)} kg</span>
@@ -433,7 +424,6 @@
     } else {
       if (!map.hasLayer(proposedLayer)) proposedLayer.addTo(map);
       if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
-      if (!map.hasLayer(proposedLayer)) proposedLayer.addTo(map);
     }
 
     renderDistrictsColoredByPart();
@@ -443,6 +433,7 @@
 
   function passesZ3(r){ return !(filterZ3 && !r.hadZ3); }
 
+  // Canal: sí respeta filtro de día
   function channelSummaryWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -469,6 +460,7 @@
     return out;
   }
 
+  // Parte: ignora filtro de día
   function partSummaryWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -481,39 +473,26 @@
       B:{count:0,kg:0},
       C:{count:0,kg:0}
     };
+
+    if (viewMode === "Actual"){
+      return res;
+    }
+
     for (const r of records){
       if (!validOffice(normalize(r.office))) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (!passesZ3(r)) continue;
-      const pass = (selectedDay === "Todos") ? true :
-        (viewMode === "Actual"
-          ? r.days.includes(selectedDay)
-          : (getProposalFields(r).proposedDays || []).includes(selectedDay)
-        );
-      if (!pass) continue;
       const prop = getProposalFields(r);
-      const part = (viewMode === "Actual") ? null : prop.part;
-      const partKey = part;
-      if (viewMode === "Actual"){
-        // En Actual, no hay parte, pero igual contamos todos en resumen (sin discriminar)
-        continue;
-      }
+      const partKey = prop.part;
       if (partKey && res[partKey]){
         res[partKey].count++;
         res[partKey].kg += (r.kg || 0);
       }
     }
-    // En Actual, mostramos 0-0-0
-    if (viewMode === "Actual"){
-      return {
-        A:{count:0,kg:0},
-        B:{count:0,kg:0},
-        C:{count:0,kg:0}
-      };
-    }
     return res;
   }
 
+  // Día: ignora filtro de día
   function daySummaryWithFilters(){
     const useAte = filterOffices.has("OFIC ATE");
     const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -529,6 +508,7 @@
       V:{count:0,kg:0},
       S:{count:0,kg:0}
     };
+
     for (const r of records){
       if (!validOffice(normalize(r.office))) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
@@ -537,8 +517,6 @@
       for (const d of dayArr){
         const letter = dayNameToLetter[d];
         if (letter && res[letter]){
-          const pass = (selectedDay === "Todos") ? true : (d === selectedDay);
-          if (!pass) continue;
           res[letter].count++;
           res[letter].kg += (r.kg || 0);
         }
@@ -551,6 +529,7 @@
     districtsLayerHolder.clearLayers();
     if (!areaFeatures) return;
     areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
+
     const layer = L.geoJSON(areaFeatures, {
       pane:'zonesPane',
       style: (feature) => {
@@ -612,7 +591,7 @@
     return res;
   }
 
-  // ====== Propuesta clientes (conteo) ======
+  // Propuesta por clientes (conteo) – aproximada
   function assignPartsClie(){
     const sorted = [...records].sort((a,b)=>a.lon - b.lon);
     const n = sorted.length; if (n === 0) return;
@@ -650,9 +629,10 @@
     }
   }
 
-  // ====== Propuesta Kg (volumen) ======
+  // Propuesta por Kg – distritos ordenados por centroide (lon,lat)
   function assignPartsKg(){
-    if (!records.length) return;
+    if (!records.length || !areaFeatures) return;
+
     const byFeat = new Map();
     for (const r of records){
       const k = r.featIdx;
@@ -662,16 +642,42 @@
       entry.records.push(r);
       entry.kg += (r.kg || 0);
     }
+
     const districtsArr = [];
     byFeat.forEach((val, idx) => {
-      districtsArr.push({featIdx: idx, kg: val.kg, records: val.records});
+      const feat = areaFeatures.features[idx];
+      let cx = 0, cy = 0;
+      try {
+        const cent = turf.centroid(feat);
+        cx = cent.geometry.coordinates[0];
+        cy = cent.geometry.coordinates[1];
+      } catch(e){
+        cx = 0; cy = 0;
+      }
+      districtsArr.push({
+        featIdx: idx,
+        kg: val.kg,
+        records: val.records,
+        cx,
+        cy
+      });
     });
-    districtsArr.sort((a,b) => b.kg - a.kg);
+
+    // Orden espacial primero por lon, luego lat; dentro de ese orden, mayor kg antes
+    districtsArr.sort((a,b) => {
+      if (a.cx === b.cx){
+        if (a.cy === b.cy) return b.kg - a.kg;
+        return a.cy - b.cy;
+      }
+      return a.cx - b.cx;
+    });
+
     const parts = {
       A:{kg:0, districts:[]},
       B:{kg:0, districts:[]},
       C:{kg:0, districts:[]}
     };
+
     for (const d of districtsArr){
       let bestPart = "A";
       let minKg = parts.A.kg;
@@ -684,12 +690,14 @@
       parts[bestPart].kg += d.kg;
       parts[bestPart].districts.push(d.featIdx);
     }
+
     featurePartByIdxKg = new Map();
     for (const p of ["A","B","C"]){
       for (const idx of parts[p].districts){
         featurePartByIdxKg.set(idx, p);
       }
     }
+
     for (const r of records){
       const mj = featurePartByIdxKg.get(r.featIdx);
       if (mj){
@@ -776,27 +784,14 @@
       "Canal","Ruta","Latitud","Longitud","Oficina","Kg_Prom",
       "Parte_Clie","Parte_Kg"
     ];
-const csv = [
-  headers.join(",")
-].concat(
-  rows.map(r => [
-    r.code,
-    r.name,
-    r.distrito,
-    r.geoDistName,
-    r.freqLetters ?? "",
-    r.proposedClieLetters ?? "",
-    r.proposedKgLetters ?? "",
-    r.canal ?? "",
-    r.route ?? "",
-    r.lat,
-    r.lon,
-    r.office ?? "",
-    r.volume ?? 0,
-    r.partClie ?? "",
-    r.partKg ?? ""
-  ].map(v => csvEscape(v)).join(","))
-).join("\r\n");
+    const csv = [headers].concat(rows.map(r => [
+      r.code, r.name, r.distrito, r.geoDistName, r.freqLetters || "",
+      r.proposedLettersClie || "", r.proposedLettersKg || "",
+      r.canal || "", r.route || "",
+      r.lat, r.lon, r.office || "", r.kg || 0,
+      r.partClie || "", r.partKg || ""
+    ].map(v => csvEscape(v)).join(","))).join("
+");
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -827,16 +822,13 @@ const csv = [
     return out;
   }
 
-function csvEscape(v){
-  const s = (v ?? "").toString();
-  // Si contiene comillas, comas o saltos de línea → encerrar entre ""
-  if (/[",\r\n]/.test(s)){
-    return `"${s.replace(/"/g, '""')}"`;
+  function csvEscape(v){
+    const s = (v ?? "").toString();
+    if (/[",
+]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+    return s;
   }
-  return s;
-}
 
-  // Eventos
   document.getElementById('viewTabs').addEventListener('click', (e)=>{
     if (e.target.tagName === "BUTTON"){
       document.querySelectorAll('#viewTabs button').forEach(b=>b.classList.remove('active'));
@@ -876,7 +868,6 @@ function csvEscape(v){
     filterZ3 = e.target.checked; renderLegend(); refreshLayers();
   });
 
-  // Carga GeoJSON + Vol_Prom + Catálogo
   fetch(GEOJSON_URL)
     .then(r => r.json())
     .then(geo => {
