@@ -332,17 +332,23 @@ const GEOJSON_URL = "https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Di
 /* Config */
 const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-/* Exclusions */
+/* SECTION: Utils - normalize() corregido */
 function normalize(s){
   try{
     return (s ?? "")
       .toString()
-      .normalize("NFD").replace(/p{Diacritic}/gu,"")
-      .toUpperCase().trim();
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toUpperCase()
+      .trim();
   }catch(e){
-    return (s ?? "").toString().toUpperCase().trim();
+    return (s ?? "")
+      .toString()
+      .toUpperCase()
+      .trim();
   }
 }
+
 
 const EXCLUDE_DISTRICTS = new Set([
   "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA",
