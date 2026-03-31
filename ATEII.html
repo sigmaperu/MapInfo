@@ -1101,12 +1101,15 @@ function fitToContent(){
   }
 }
 
-/* CSV export */
+
+/* CSV export – versión corregida */
 function csvEscape(v){
   const s = (v ?? "").toString();
-  return /[",
-]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  return /[",\r\n]/.test(s) 
+    ? `"${s.replace(/"/g,'""')}"` 
+    : s;
 }
+
 
 function getFilteredRowsForExport(){
   const out = [];
