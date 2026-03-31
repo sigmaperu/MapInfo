@@ -1,4 +1,3 @@
-<!-- INICIO PARTE 1/20 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>ATEII 2026 · Actual · Prop Clie · Prop Kg</title>
 
-<!-- SECTION: Libraries -->
+<!-- Libraries -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
-<!-- SECTION: Global Styles -->
+<!-- Global Styles -->
 <style>
 :root{
   --md-bg:#0b0f14;
@@ -184,16 +183,30 @@ input[type="checkbox"].toggle-input:checked + .toggle .knob{
   height:calc(100vh - 70px);
 }
 
+/* Leyenda mejor visible */
 .legend{
   position:absolute;
   bottom:12px; left:12px;
-  background:var(--md-surface);
+  background:rgba(15,21,32,0.96);
   border:1px solid var(--md-outline);
-  padding:10px;
+  padding:8px 10px;
   border-radius:10px;
   font-size:11px;
-  max-width:330px;
+  max-width:340px;
   box-shadow:var(--elev);
+  color:var(--md-text);
+}
+
+.legend h4{
+  margin:0 0 4px 0;
+  font-size:12px;
+}
+
+.legend .row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-top:2px;
 }
 
 .swatch{
@@ -222,37 +235,35 @@ input[type="checkbox"].toggle-input:checked + .toggle .knob{
   border:1px solid #111827;
 }
 
+.popup-line{
+  margin-bottom:2px;
+}
+
+.popup-muted{
+  color:#9fb0c3;
+  font-size:10px;
+}
+
 .leaflet-control-container .leaflet-bottom.leaflet-right{
   bottom:12px; right:12px;
 }
-
-</style>
-<!-- FIN PARTE 1/20 -->
-
-<!-- INICIO PARTE 2/20 -->
-
 </style>
 </head>
 <body>
 
-<!-- SECTION: Header -->
 <header>
-
   <div style="display:flex; flex-direction:column; line-height:1;">
     <h1>ATEII · Atención 2026</h1>
     <div class="muted">Actual · Prop Clie · Prop Kg</div>
   </div>
 
-  <!-- SECTION: Mode Switch (Actual / Prop Clie / Prop Kg) -->
   <div class="mode-bar">
     <button class="mode-btn active" data-mode="actual">Actual</button>
     <button class="mode-btn" data-mode="clie">Prop Clie</button>
     <button class="mode-btn" data-mode="kg">Prop Kg</button>
   </div>
 
-  <!-- SECTION: Controls -->
   <div class="controls">
-
     <!-- Día -->
     <div class="group">
       <strong style="font-size:10px;">Día:</strong>
@@ -304,32 +315,35 @@ input[type="checkbox"].toggle-input:checked + .toggle .knob{
     <div class="group">
       <button id="exportBtn" class="btn">CSV</button>
     </div>
-
-  </div> <!-- end controls -->
-
+  </div>
 </header>
 
-<!-- SECTION: Map + Legend -->
 <div id="map"></div>
 <div class="legend" id="legend"></div>
 
-<!-- SECTION: Script Start -->
 <script>
 (function(){
 
-/* SECTION: Core URLs */
+/* Core URLs */
 const CSV_URL     = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Catalogo%20Sigma.csv";
 const VOL_URL     = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Vol_Prom.csv";
 const GEOJSON_URL = "https://raw.githubusercontent.com/sigmaperu/RoadMap/main/Distritos.geojson";
 
-/* SECTION: Config */
+/* Config */
 const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
-<!-- FIN PARTE 2/20 -->
+/* Exclusions */
+function normalize(s){
+  try{
+    return (s ?? "")
+      .toString()
+      .normalize("NFD").replace(/p{Diacritic}/gu,"")
+      .toUpperCase().trim();
+  }catch(e){
+    return (s ?? "").toString().toUpperCase().trim();
+  }
+}
 
-<!-- INICIO PARTE 3/20 (CORREGIDA) -->
-
-/* SECTION: Exclusions */
 const EXCLUDE_DISTRICTS = new Set([
   "ANCON","ANCÓN","MI PERU","MI PERÚ","SANTA ROSA",
   "VENTANILLA","PUENTE PIEDRA","CARABAYLLO"
@@ -345,12 +359,11 @@ const MOD_EXCLUDE_KEYWORDS = [
   "Comidas gourmet","Delivery Hero","Ajiles","Solana"
 ].map(s => normalize(s));
 
-/* SECTION: Days */
+/* Days */
 const dayLetterToName = { L:"Lunes", M:"Martes", X:"Miércoles", J:"Jueves", V:"Viernes", S:"Sábado" };
 const dayNameToLetter = { "Lunes":"L","Martes":"M","Miércoles":"X","Jueves":"J","Viernes":"V","Sábado":"S" };
 const orderDays = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 
-/* SECTION: Parts A/B/C */
 const partToDays = {
   A:["Lunes","Jueves"],
   B:["Martes","Viernes"],
@@ -360,7 +373,7 @@ const partToFreqLetters = { A:"LJ", B:"MV", C:"XS" };
 const partColors = { A:"#5a76ff", B:"#30c48d", C:"#a56cff" };
 const partFill   = { A:"#5a76ff", B:"#30c48d", C:"#a56cff" };
 
-/* SECTION: App State */
+/* App State */
 let viewMode = "actual";
 let selectedDay = "Todos";
 let selectedCanal = "Todos";
@@ -368,7 +381,7 @@ let filterOffices = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 let showMarkers = true;
 let filterZ3 = false;
 
-/* SECTION: Map Setup */
+/* Map Setup */
 const map = L.map("map",{ preferCanvas:true, zoomControl:false });
 L.control.zoom({ position:"bottomright" }).addTo(map);
 
@@ -379,14 +392,12 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
   attribution:"© OpenStreetMap"
 }).addTo(map);
 
-/* SECTION: Layers */
-const currentLayer    = L.layerGroup().addTo(map);
-const propuestaClie   = L.layerGroup();
-const propuestaKg     = L.layerGroup();
-const boundaryLayer   = L.geoJSON(null,{ pane:"zonesPane", style:{ color:"#ef4444", weight:1, fill:false }}).addTo(map);
-const districtsLayer  = L.layerGroup().addTo(map);
+/* Layers */
+const markersLayer   = L.layerGroup().addTo(map);      // único grupo de marcadores
+const boundaryLayer  = L.geoJSON(null,{ pane:"zonesPane", style:{ color:"#ef4444", weight:1, fill:false }}).addTo(map);
+const districtsLayer = L.layerGroup().addTo(map);
 
-/* SECTION: Data Containers */
+/* Data containers */
 let areaFeatures = null;
 let records = [];
 let volumenDict = {};
@@ -394,39 +405,16 @@ let neighbors = {};
 let featurePart_Clientes = new Map();
 let featurePart_Kg = new Map();
 
-/* SECTION: Utils */
-
-/* ✅ Fix: hasHeader() */
-function hasHeader(row){
-  const a = num(row[28]);
-  const b = num(row[29]);
-  const t28 = (row[28] ?? "").toString().toLowerCase();
-  const t29 = (row[29] ?? "").toString().toLowerCase();
-  if(!Number.isFinite(a) || !Number.isFinite(b)) return true;
-  if(t28.includes("lat") || t29.includes("lon")) return true;
-  return false;
-}
-
-function normalize(s){
-  try{
-    return (s ?? "")
-      .toString()
-      .normalize("NFD").replace(/\p{Diacritic}/gu,"")
-      .toUpperCase().trim();
-  }catch(e){
-    return (s ?? "").toString().toUpperCase().trim();
-  }
-}
-
-function normalizeName(s){
-  return normalize(s).replace(/\s+/g," ");
-}
-
+/* Utils */
 function num(s){
   if(s == null) return NaN;
   const t = s.toString().replace(",",".");
   const v = parseFloat(t);
   return Number.isFinite(v) ? v : NaN;
+}
+
+function normalizeName(s){
+  return normalize(s).replace(/s+/g," ");
 }
 
 function escapeHtml(str){
@@ -457,14 +445,24 @@ function compactNumber(n){
   return n.toString();
 }
 
-/* ✅ Fix: colorForChannel() */
+/* Detect header row robusto */
+function hasHeader(row){
+  const a = num(row[28]);
+  const b = num(row[29]);
+  const t28 = (row[28] ?? "").toString().toLowerCase();
+  const t29 = (row[29] ?? "").toString().toLowerCase();
+  if(t28.includes("lat") || t29.includes("lon")) return true;
+  if(!Number.isFinite(a) || !Number.isFinite(b)) return true;
+  return false;
+}
+
+/* Canal colors */
 const baseColors = [
   "#22c55e","#eab308","#06b6d4","#f97316",
   "#a855f7","#ef4444","#14b8a6","#f43f5e",
   "#84cc16","#e879f9","#60a5fa","#f59e0b",
   "#10b981","#8b5cf6"
 ];
-
 let channelPalette = {};
 
 function colorForChannel(canal){
@@ -480,11 +478,7 @@ function colorForChannel(canal){
   return color;
 }
 
-<!-- FIN PARTE 3/20 (CORREGIDA) -->
-  
-<!-- INICIO PARTE 4/20 -->
-
-/* SECTION: GeoJSON District Name */
+/* GeoJSON district name */
 const DIST_KEYS = [
   "NOMBDIST","DISTRITO","DIST","NOMBRE","NAME",
   "nom_dist","nomdistr","distrito","Distrito",
@@ -506,7 +500,7 @@ function getFeatureDistName(f){
   return "Distrito";
 }
 
-/* SECTION: Locate District Containing Point */
+/* Locate district containing point */
 function getContainingFeature(lat, lon){
   if(!areaFeatures) return null;
   const pt = turf.point([lon, lat]);
@@ -519,7 +513,7 @@ function getContainingFeature(lat, lon){
   return null;
 }
 
-/* SECTION: District Contiguity (neighbors[]) */
+/* District contiguity */
 function computeContiguity(){
   if(!areaFeatures || !areaFeatures.features) return;
   const feats = areaFeatures.features;
@@ -543,7 +537,7 @@ function computeContiguity(){
   }
 }
 
-/* SECTION: Load Volumenes */
+/* Load volumenes */
 function ingestVolumenes(rows){
   for(let i=1;i<rows.length;i++){
     const row = rows[i];
@@ -554,11 +548,7 @@ function ingestVolumenes(rows){
   }
 }
 
-<!-- FIN PARTE 4/20 -->
-
-<!-- INICIO PARTE 5/20 -->
-
-/* SECTION: Ingest Catalog CSV */
+/* Ingest catalog CSV */
 function ingestRows(rows){
   const startIdx = hasHeader(rows[0]) ? 1 : 0;
   const prelim = [];
@@ -642,7 +632,7 @@ function ingestRows(rows){
   refreshLayers();
 }
 
-/* SECTION: Populate Canal Filter */
+/* Populate canal filter */
 function populateCanalFilter(canalList){
   const sel = document.getElementById("canalFilter");
   const uniq = Array.from(new Set(canalList));
@@ -653,7 +643,7 @@ function populateCanalFilter(canalList){
     ).join("");
 }
 
-/* SECTION: Assign Proposal by Clients */
+/* Assign proposal by clientes */
 function assignBalancedParts_Clientes(){
   if(!records.length) return;
 
@@ -697,18 +687,13 @@ function assignBalancedParts_Clientes(){
   }
 }
 
-<!-- FIN PARTE 5/20 -->
-
-<!-- INICIO PARTE 6/20 -->
-
-/* SECTION: Assign Proposal by KG (contiguous & balanced) */
+/* Assign proposal by KG (contiguous & balanced) */
 function assignBalancedParts_Kg(){
   if(!records.length || !areaFeatures) return;
 
   const feats = areaFeatures.features;
   const N = feats.length;
 
-  /* Volumen por distrito */
   const volPerDist = Array(N).fill(0);
   for(const r of records){
     if(r.featIdx != null){
@@ -716,14 +701,12 @@ function assignBalancedParts_Kg(){
     }
   }
 
-  /* Orden preliminar por centroide */
   const ordered = [...Array(N).keys()].sort((i,j)=>{
     const lonA = turf.centroid(feats[i]).geometry.coordinates[0];
     const lonB = turf.centroid(feats[j]).geometry.coordinates[0];
     return lonA - lonB;
   });
 
-  /* Greedy inicial */
   let A=0,B=0,C=0;
   const distPart = Array(N).fill(null);
 
@@ -734,7 +717,6 @@ function assignBalancedParts_Kg(){
     else { distPart[idx]="C"; C+=v; }
   }
 
-  /* Contigüidad */
   function isContiguous(label){
     const nodes = [];
     for(let i=0;i<N;i++){
@@ -754,7 +736,6 @@ function assignBalancedParts_Kg(){
         }
       }
     }
-
     return visited.size === nodes.length;
   }
 
@@ -775,7 +756,6 @@ function assignBalancedParts_Kg(){
     return diff(L) <= avg * 0.12;
   }
 
-  /* Rebalance */
   let improving = true;
   while(improving){
     improving = false;
@@ -828,7 +808,6 @@ function assignBalancedParts_Kg(){
     }
   }
 
-  /* Asignar a clientes */
   featurePart_Kg = new Map();
   for(let i=0;i<N;i++){
     featurePart_Kg.set(i, distPart[i]);
@@ -842,11 +821,7 @@ function assignBalancedParts_Kg(){
   }
 }
 
-<!-- FIN PARTE 6/20 -->
-
-<!-- INICIO PARTE 7/20 -->
-
-/* SECTION: Popup for Clients */
+/* Popup for clients */
 function buildPopUp(r){
   const gm = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
 
@@ -886,13 +861,13 @@ function buildPopUp(r){
       </div>
 
       <div class="popup-line" style="margin-top:6px;">
-        ${gm}
+        <a href="${gm}" target="_blank">Abrir en Google Maps</a>
       </div>
     </div>
   `;
 }
 
-/* SECTION: District Summary Popup */
+/* District summary popup */
 function summarizeDistrict(idx){
   const useAte    = filterOffices.has("OFIC ATE");
   const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -931,11 +906,7 @@ function summarizeDistrict(idx){
   return out;
 }
 
-<!-- FIN PARTE 7/20 -->
-
-<!-- INICIO PARTE 8/20 -->
-
-/* SECTION: Legend Rendering */
+/* Legend rendering */
 function renderLegend(){
   const legend = document.getElementById("legend");
   const channelCounts  = {};
@@ -975,7 +946,7 @@ function renderLegend(){
                             "⚖️ Prop Kg";
 
   let html = `<h4>${header}</h4>`;
-  html += `<div>${selectedDay} · Canal: ${escapeHtml(selectedCanal)}</div>`;
+  html += `<div style="color:#9fb0c3;">${selectedDay} · Canal: ${escapeHtml(selectedCanal)}</div>`;
   html += `<div style="margin-top:6px;color:#9fb0c3;">Canales visibles</div>`;
 
   const keys = Object.keys(channelCounts).sort();
@@ -996,7 +967,7 @@ function renderLegend(){
   legend.innerHTML = html;
 }
 
-/* SECTION: Draw District Polygons */
+/* Draw districts */
 function renderDistricts(){
   districtsLayer.clearLayers();
   if(!areaFeatures) return;
@@ -1007,13 +978,11 @@ function renderDistricts(){
 
     style: f => {
       const idx = f.properties.__idx;
-      let p = null;
-
       if(viewMode === "actual"){
         return { color:"#ef4444", weight:1, fillOpacity:0 };
       }
 
-      p = (viewMode==="clie")
+      const p = (viewMode==="clie")
           ? featurePart_Clientes.get(idx)
           : featurePart_Kg.get(idx);
 
@@ -1053,11 +1022,9 @@ function renderDistricts(){
   layer.addTo(districtsLayer);
 }
 
-/* SECTION: Draw Markers */
+/* Draw markers — se reutiliza un solo LayerGroup */
 function refreshMarkers(){
-  currentLayer.clearLayers();
-  propuestaClie.clearLayers();
-  propuestaKg.clearLayers();
+  markersLayer.clearLayers();
 
   const useAte    = filterOffices.has("OFIC ATE");
   const useChorri = filterOffices.has("OFIC CHORRILLOS");
@@ -1065,6 +1032,8 @@ function refreshMarkers(){
   const validOffice = o =>
     (o==="OFIC ATE" && useAte) ||
     (o==="OFIC CHORRILLOS" && useChorri);
+
+  if(!showMarkers) return;
 
   for(const r of records){
 
@@ -1080,8 +1049,6 @@ function refreshMarkers(){
     }
     if(!pass) continue;
 
-    if(!showMarkers) continue;
-
     const mk = L.circleMarker([r.lat,r.lon],{
       pane:"markersPane",
       radius:5.4,
@@ -1091,17 +1058,11 @@ function refreshMarkers(){
       fillOpacity:0.95
     }).bindPopup(buildPopUp(r));
 
-    if(viewMode==="actual") currentLayer.addLayer(mk);
-    else if(viewMode==="clie") propuestaClie.addLayer(mk);
-    else propuestaKg.addLayer(mk);
+    markersLayer.addLayer(mk);
   }
 }
 
-<!-- FIN PARTE 8/20 -->
-
-<!-- INICIO PARTE 9/20 -->
-
-/* SECTION: Full Layer Refresh */
+/* Full refresh */
 function refreshLayers(){
   refreshMarkers();
   renderDistricts();
@@ -1109,14 +1070,12 @@ function refreshLayers(){
   fitToContent();
 }
 
-/* SECTION: Fit Map to Visible Content */
+/* Fit map to visible content */
 function fitToContent(){
   let bounds = null;
 
   const layers = [
-    currentLayer,
-    propuestaClie,
-    propuestaKg,
+    markersLayer,
     boundaryLayer,
     districtsLayer
   ];
@@ -1136,10 +1095,11 @@ function fitToContent(){
   }
 }
 
-/* SECTION: CSV Export */
+/* CSV export */
 function csvEscape(v){
   const s = (v ?? "").toString();
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  return /[",
+]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
 }
 
 function getFilteredRowsForExport(){
@@ -1197,7 +1157,8 @@ document.getElementById("exportBtn").addEventListener("click",()=>{
       r.office,
       r.volume ?? 0
     ].map(csvEscape).join(","))
-  ).join("\r\n");
+  ).join("
+");
 
   const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"});
   const url  = URL.createObjectURL(blob);
@@ -1210,11 +1171,7 @@ document.getElementById("exportBtn").addEventListener("click",()=>{
   URL.revokeObjectURL(url);
 });
 
-<!-- FIN PARTE 9/20 -->
-
-<!-- INICIO PARTE 10/20 -->
-
-/* SECTION: Mode Switch (Actual / Clie / Kg) */
+/* Mode switch */
 document.querySelectorAll(".mode-btn").forEach(btn=>{
   btn.addEventListener("click",()=>{
 
@@ -1228,7 +1185,7 @@ document.querySelectorAll(".mode-btn").forEach(btn=>{
   });
 });
 
-/* SECTION: Day Filter */
+/* Day filter */
 document.getElementById("dayFilter").addEventListener("click", e=>{
   if(e.target.tagName === "BUTTON"){
     document.querySelectorAll("#dayFilter button")
@@ -1241,13 +1198,13 @@ document.getElementById("dayFilter").addEventListener("click", e=>{
   }
 });
 
-/* SECTION: Canal Filter */
+/* Canal filter */
 document.getElementById("canalFilter").addEventListener("change", e=>{
   selectedCanal = e.target.value ?? "Todos";
   refreshLayers();
 });
 
-/* SECTION: Offices */
+/* Offices */
 document.getElementById("oficAte").addEventListener("change", e=>{
   if(e.target.checked) filterOffices.add("OFIC ATE");
   else filterOffices.delete("OFIC ATE");
@@ -1260,19 +1217,19 @@ document.getElementById("oficChorri").addEventListener("change", e=>{
   refreshLayers();
 });
 
-/* SECTION: Marker Toggle */
+/* Marker toggle */
 document.getElementById("markersToggle").addEventListener("change", e=>{
   showMarkers = e.target.checked;
   refreshLayers();
 });
 
-/* SECTION: Z3 Toggle */
+/* Z3 toggle */
 document.getElementById("z3Toggle").addEventListener("change", e=>{
   filterZ3 = e.target.checked;
   refreshLayers();
 });
 
-/* SECTION: Load All (Volumen + Distritos + CSV) */
+/* Load all (volumen + distritos + CSV) */
 function loadAll(){
 
   Papa.parse(VOL_URL,{
@@ -1314,66 +1271,7 @@ function loadAll(){
 
 loadAll();
 
-<!-- FIN PARTE 10/20 -->
-
-<!-- INICIO PARTE 11/20 -->
-
-})();  <!-- cierre del IIFE principal -->
-
+})();  /* cierre IIFE */
 </script>
-
-<!-- FIN PARTE 11/20 -->
-
-<!-- INICIO PARTE 12/20 -->
-
-<!-- SECTION: Document End -->
 </body>
-
-<!-- INICIO PARTE 13/20 -->
-
-<!-- EXTRA BLOCK 13 (vacío para extensiones futuras) -->
-
-<!-- FIN PARTE 13/20 -->
-
-<!-- INICIO PARTE 14/20 -->
-
-<!-- EXTRA BLOCK 14 (reservado para extensiones, notas o módulos futuros) -->
-
-<!-- FIN PARTE 14/20 -->
-
-<!-- INICIO PARTE 15/20 -->
-
-<!-- EXTRA BLOCK 15 (espacio reservado para notas internas o futuras funciones) -->
-
-<!-- FIN PARTE 15/20 -->
-
-<!-- INICIO PARTE 16/20 -->
-
-<!-- EXTRA BLOCK 16 (espacio reservado para futuras ampliaciones o etiquetas personalizadas) -->
-
-<!-- FIN PARTE 16/20 -->
-
-<!-- INICIO PARTE 17/20 -->
-
-<!-- EXTRA BLOCK 17 (espacio reservado para personalizaciones futuras) -->
-
-<!-- FIN PARTE 17/20 -->
-``
-<!-- INICIO PARTE 18/20 -->
-
-<!-- EXTRA BLOCK 18 (reservado para configuraciones o adiciones futuras) -->
-
-<!-- FIN PARTE 18/20 -->
-
-<!-- INICIO PARTE 19/20 -->
-
-<!-- EXTRA BLOCK 19 (espacio disponible para futuras ampliaciones del proyecto ATEII 2026) -->
-
-<!-- FIN PARTE 19/20 -->
-
-<!-- INICIO PARTE 20/20 -->
-
-<!-- EXTRA BLOCK 20 (cierre final del esquema de 20 partes) -->
-
-<!-- FIN PARTE 20/20 -->
-``
+</html>
