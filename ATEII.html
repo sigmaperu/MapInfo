@@ -1151,7 +1151,9 @@ document.getElementById("exportBtn").addEventListener("click",()=>{
     "Canal","Lat","Lon","Oficina","Vol_kg"
   ];
 
-  const csv = [header.join(",")].concat(
+
+const csv = [ header.join(",") ]
+  .concat(
     rows.map(r => [
       r.code,
       r.name,
@@ -1166,8 +1168,9 @@ document.getElementById("exportBtn").addEventListener("click",()=>{
       r.office,
       r.volume ?? 0
     ].map(csvEscape).join(","))
-  ).join("
-");
+  )
+  .join("\r\n");
+
 
   const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"});
   const url  = URL.createObjectURL(blob);
