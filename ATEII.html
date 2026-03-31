@@ -327,7 +327,7 @@ const OFFICES = new Set(["OFIC ATE","OFIC CHORRILLOS"]);
 
 <!-- FIN PARTE 2/20 -->
 
-<!-- INICIO PARTE 3/20 -->
+<!-- INICIO PARTE 3/20 (CORREGIDA) -->
 
 /* SECTION: Exclusions */
 const EXCLUDE_DISTRICTS = new Set([
@@ -391,11 +391,22 @@ let areaFeatures = null;
 let records = [];
 let volumenDict = {};
 let neighbors = {};
-
 let featurePart_Clientes = new Map();
 let featurePart_Kg = new Map();
 
 /* SECTION: Utils */
+
+/* ✅ FIX — función faltante que causaba el error */
+function hasHeader(row){
+  const a = num(row[28]);
+  const b = num(row[29]);
+  const t28 = (row[28] ?? "").toString().toLowerCase();
+  const t29 = (row[29] ?? "").toString().toLowerCase();
+  if(!Number.isFinite(a) || !Number.isFinite(b)) return true;
+  if(t28.includes("lat") || t29.includes("lon")) return true;
+  return false;
+}
+
 function normalize(s){
   try{
     return (s ?? "").toString()
@@ -445,8 +456,8 @@ function compactNumber(n){
   return n.toString();
 }
 
-<!-- FIN PARTE 3/20 -->
-
+<!-- FIN PARTE 3/20 (CORREGIDA) -->
+  
 <!-- INICIO PARTE 4/20 -->
 
 /* SECTION: GeoJSON District Name */
