@@ -201,10 +201,14 @@
   let adjacency = new Map();
   let districtStats = new Map();
 
-  function normalize(s){
-    try { return (s ?? "").toString().normalize("NFD").replace(/p{Diacritic}/gu, "").toUpperCase().trim(); }
-    catch(e){ return (s ?? "").toString().toUpperCase().trim(); }
-  }
+function normalize(s){
+  return (s ?? "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .trim();
+}
   function normalizeName(s){ return normalize(s).replace(/s+/g,' '); }
   function num(s){ if (s == null) return NaN; const t = s.toString().replace(",", "."); const v = parseFloat(t); return Number.isFinite(v) ? v : NaN; }
 
@@ -830,14 +834,27 @@
       "Canal","Ruta","Latitud","Longitud","Oficina","Kg_Prom",
       "Parte_Clie","Parte_Kg"
     ];
-    const csv = [headers].concat(rows.map(r => [
-      r.code, r.name, r.distrito, r.geoDistName, r.freqLetters || "",
-      r.proposedLettersClie || "", r.proposedLettersKg || "",
-      r.canal || "", r.route || "",
-      r.lat, r.lon, r.office || "", r.kg || 0,
-      r.partClie || "", r.partKg || ""
-    ].map(v => csvEscape(v)).join(","))).join("
-");
+const csv = [
+  headers.join(",")
+].concat(
+  rows.map(r => [
+    r.code,
+    r.name,
+    r.distrito,
+    r.geoDistName,
+    r.freqLetters ?? "",
+    r.proposedClieLetters ?? "",
+    r.proposedKgLetters ?? "",
+    r.canal ?? "",
+    r.route ?? "",
+    r.lat,
+    r.lon,
+    r.office ?? "",
+    r.volume ?? 0,      // antes estaba r.kg
+    r.partClie ?? "",
+    r.partKg ?? ""
+  ].map(csvEscape).join(","))
+).join("\r\n");
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -859,12 +876,14 @@
     return out;
   }
 
-  function csvEscape(v){
-    const s = (v ?? "").toString();
-    if (/[",
-]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
-    return s;
+function csvEscape(v){
+  const s = (v ?? "").toString();
+  // Si contiene comas, comillas o saltos de línea → encerrar y escapar
+  if (/[",\r\n]/.test(s)){
+    return `"${s.replace(/"/g, '""')}"`;
   }
+  return s;
+}
 
   document.getElementById('viewTabs').addEventListener('click', (e)=>{
     if (e.target.tagName === "BUTTON"){
