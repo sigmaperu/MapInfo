@@ -819,12 +819,14 @@ const csv = [
     return out;
   }
 
-  function csvEscape(v){
-    const s = (v ?? "").toString();
-    if (/[",
-]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
-    return s;
+function csvEscape(v){
+  const s = (v ?? "").toString();
+  // Si contiene comas, comillas o saltos de línea → encerrar y escapar
+  if (/[",\r\n]/.test(s)){
+    return `"${s.replace(/"/g, '""')}"`;
   }
+  return s;
+}
 
   document.getElementById('viewTabs').addEventListener('click', (e)=>{
     if (e.target.tagName === "BUTTON"){
