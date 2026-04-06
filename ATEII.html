@@ -210,10 +210,21 @@
   let kgByCode = new Map();
   let districtOrder = [];
 
-  function normalize(s){
-    try { return (s ?? "").toString().normalize("NFD").replace(/p{Diacritic}/gu, "").toUpperCase().trim(); }
-    catch(e){ return (s ?? "").toString().toUpperCase().trim(); }
+function normalize(s){
+  try {
+    return (s ?? "")
+      .toString()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toUpperCase()
+      .trim();
+  } catch (e) {
+    return (s ?? "")
+      .toString()
+      .toUpperCase()
+      .trim();
   }
+}
   function normalizeName(s){ return normalize(s).replace(/s+/g,' '); }
   function num(s){ if (s == null) return NaN; const t = s.toString().replace(",", "."); const v = parseFloat(t); return Number.isFinite(v) ? v : NaN; }
 
