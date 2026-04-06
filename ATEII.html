@@ -69,7 +69,7 @@
  #map{ height: calc(100vh - 86px); }
  .legend{
   position:absolute; bottom:12px; left:12px; z-index:600; background:rgba(15,21,32,.94);
-  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width:470px; box-shadow:var(--elev);
+  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width:520px; box-shadow:var(--elev);
   backdrop-filter: blur(8px);
  }
  .legend h4{ margin:0 0 4px 0; font-size:12px; }
@@ -173,7 +173,6 @@
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
 
-  // Frecuencias especiales de 3 días para Prop. Kg
   const SPECIAL_3DAY_DISTRICTS = new Set(["MIRAFLORES","SAN ISIDRO"]);
   const SPECIAL_3DAY_PATTERN = ["Lunes","Miércoles","Viernes"];
   const SPECIAL_3DAY_LETTERS = "LMV";
@@ -184,7 +183,6 @@
   const KG_WEIGHT = 1.0;
   const CLIENT_WEIGHT = 6.0;
   const MAX_ITERS = 35;
-  const ENABLE_AUDIT = true;
 
   let viewMode = "Actual";
   let selectedDay = "Todos";
@@ -211,20 +209,20 @@
   let adjacency = new Map();
   let districtStats = new Map();
 
-  const audit = {
-    moved: [],
-    special3day: [],
-    totalsBeforeSpecial: null,
-    totalsAfterSpecial: null
-  };
-
 function normalize(s){
-  return (s ?? "")
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .trim();
+  try {
+    return (s ?? "")
+      .toString()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toUpperCase()
+      .trim();
+  } catch (e) {
+    return (s ?? "")
+      .toString()
+      .toUpperCase()
+      .trim();
+  }
 }
   function normalizeName(s){ return normalize(s).replace(/s+/g,' '); }
   function num(s){ if (s == null) return NaN; const t = s.toString().replace(",", "."); const v = parseFloat(t); return Number.isFinite(v) ? v : NaN; }
@@ -308,32 +306,83 @@ function normalize(s){
     return { part:null, proposedDays:[], proposedLetters:"" };
   }
 
+  function getWeeklyFactor(r, mode){
+    if (mode === "Actual") return (r.days?.length || 0);
+    if (mode === "PropClie") return (r.proposedDaysClie?.length || 0);
+    if (mode === "PropKg") return (r.proposedDaysKg?.length || 0);
+    return 0;
+  }
+
+  function getKgWeekly(r, mode){
+    return (r.kg || 0) * getWeeklyFactor(r, mode);
+  }
+
+  function getClientWeeklyContacts(r, mode){
+    return getWeeklyFactor(r, mode);
+  }
+
+  function getPartSharesKg(r){
+    if (!r.isSpecial3DayKg){
+      return [{
+        part: r.partKg,
+        contacts: r.proposedDaysKg.length,
+        kg: (r.kg || 0) * r.proposedDaysKg.length
+      }];
+    }
+
+    const p1 = r.partKgPrimary || r.partKg;
+    const p2 = r.partKgSecondary || r.partKg;
+
+    return [
+      { part: p1, contacts: 2, kg: (r.kg || 0) * 2 },
+      { part: p2, contacts: 1, kg: (r.kg || 0) * 1 }
+    ];
+  }
+
+  function getDaySharesKg(r){
+    if (!r.isSpecial3DayKg){
+      return (r.proposedDaysKg || []).map(d => ({
+        day: d,
+        contacts: 1,
+        kg: (r.kg || 0)
+      }));
+    }
+
+    return [
+      { day: "Lunes", contacts: 1, kg: (r.kg || 0) },
+      { day: "Miércoles", contacts: 1, kg: (r.kg || 0) },
+      { day: "Viernes", contacts: 1, kg: (r.kg || 0) }
+    ];
+  }
+
   function buildPopUp(r){
     const gm = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
     const prop = getProposalFields(r);
     const proposedDaysStr = (prop.proposedDays && prop.proposedDays.length) ? prop.proposedDays.join(", ") : "—";
-    const partDays = prop.part ? (partToDays[prop.part]?.join(" & ")) : "Especial";
     const distShown = r.geoDistName || r.distrito || "—";
     const freqNow = r.freqLetters || "—";
     const freqProp = prop.proposedLetters || "—";
     const kgStr = (r.kg && r.kg > 0) ? `${r.kg.toFixed(1)} kg prom.` : "Sin dato";
+    const special = r.isSpecial3DayKg && viewMode === "PropKg"
+      ? `<div class="popup-line"><span class="pill" style="color:#fde68a;">3 días especial</span> <span class="popup-muted">${escapeHtml((r.partKgPrimary || "") + " / " + (r.partKgSecondary || ""))}</span></div>`
+      : "";
     let lblProp = "Propuesta";
     if (viewMode === "PropClie") lblProp = "Prop. Clie";
     if (viewMode === "PropKg") lblProp = "Prop. Kg";
-    const special = r.isSpecial3DayKg ? `<div class="popup-line"><span class="pill" style="color:#fde68a;">3 días especial</span></div>` : "";
     return `
-      <div style="min-width:280px; line-height:1.3;">
+      <div style="min-width:285px; line-height:1.3;">
         <div class="popup-line" style="font-weight:800; font-size:14px;">Cliente: ${escapeHtml(r.code)}</div>
         <div class="popup-line"><strong>Nombre:</strong> ${escapeHtml(r.name || "")}</div>
         <div class="popup-line"><strong>Canal:</strong> ${escapeHtml(r.canal || "")}</div>
         <div class="popup-line"><strong>Distrito:</strong> ${escapeHtml(distShown)}</div>
         <div class="popup-line"><strong>Oficina:</strong> ${escapeHtml(r.office || "")}</div>
-        <div class="popup-line"><strong>Kg promedio:</strong> ${kgStr}</div>
+        <div class="popup-line"><strong>Kg promedio por visita:</strong> ${kgStr}</div>
         ${special}
         <hr style="border:none;border-top:1px solid #1f2937; margin:6px 0;">
         <div class="popup-line"><strong>Frecuencia actual:</strong> <span class="freq">${freqNow}</span></div>
         <div class="popup-line"><strong>${lblProp}:</strong> <span class="freq">${freqProp}</span> <span class="popup-muted">(${escapeHtml(proposedDaysStr)})</span></div>
-        <div class="popup-line"><strong>Parte:</strong> ${prop.part ?? "—"} <span class="popup-muted">(${escapeHtml(partDays)})</span></div>
+        <div class="popup-line"><strong>Contactos semanales:</strong> ${escapeHtml(String(getWeeklyFactor(r, viewMode)))}</div>
+        <div class="popup-line"><strong>Kg semanales:</strong> ${escapeHtml(getKgWeekly(r, viewMode).toFixed(1))}</div>
         <div class="popup-line"><strong>Ruta:</strong> ${escapeHtml(r.route || "")}</div>
         <div class="popup-line" style="margin-top:6px;">
           <a href="${gm}" target="_blank" rel="noopener noreferrer">Abrir en Google Maps ↗</a>
@@ -348,46 +397,92 @@ function normalize(s){
       if (!isValidOffice(r.office)) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (!passesZ3(r)) continue;
+
       const pass = (selectedDay === "Todos") ? true :
-        (viewMode === "Actual" ? r.days.includes(selectedDay) : (getProposalFields(r).proposedDays || []).includes(selectedDay));
+        (viewMode === "Actual"
+          ? r.days.includes(selectedDay)
+          : (getProposalFields(r).proposedDays || []).includes(selectedDay)
+        );
       if (!pass) continue;
+
       const key = r.canal || "Sin canal";
-      if (!out[key]) out[key] = {count:0, kg:0};
-      out[key].count++;
-      out[key].kg += (r.kg || 0);
+      if (!out[key]) out[key] = {contacts:0, kg:0};
+
+      if (viewMode === "Actual"){
+        out[key].contacts += getClientWeeklyContacts(r, "Actual");
+        out[key].kg += getKgWeekly(r, "Actual");
+      } else if (viewMode === "PropClie"){
+        out[key].contacts += getClientWeeklyContacts(r, "PropClie");
+        out[key].kg += getKgWeekly(r, "PropClie");
+      } else {
+        out[key].contacts += getClientWeeklyContacts(r, "PropKg");
+        out[key].kg += getKgWeekly(r, "PropKg");
+      }
     }
     return out;
   }
 
   function partSummaryWithFilters(){
-    const res = { A:{count:0,kg:0}, B:{count:0,kg:0}, C:{count:0,kg:0} };
+    const res = { A:{contacts:0,kg:0}, B:{contacts:0,kg:0}, C:{contacts:0,kg:0} };
     if (viewMode === "Actual") return res;
+
     for (const r of records){
       if (!isValidOffice(r.office)) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (!passesZ3(r)) continue;
-      const prop = getProposalFields(r);
-      if (prop.part && res[prop.part]){
-        res[prop.part].count++;
-        res[prop.part].kg += (r.kg || 0);
+
+      if (viewMode === "PropClie"){
+        const p = r.partClie;
+        if (p && res[p]){
+          res[p].contacts += r.proposedDaysClie.length;
+          res[p].kg += (r.kg || 0) * r.proposedDaysClie.length;
+        }
+      } else {
+        const shares = getPartSharesKg(r);
+        shares.forEach(s => {
+          if (s.part && res[s.part]){
+            res[s.part].contacts += s.contacts;
+            res[s.part].kg += s.kg;
+          }
+        });
       }
     }
     return res;
   }
 
   function daySummaryWithFilters(){
-    const res = { L:{count:0,kg:0}, M:{count:0,kg:0}, X:{count:0,kg:0}, J:{count:0,kg:0}, V:{count:0,kg:0}, S:{count:0,kg:0} };
+    const res = { L:{contacts:0,kg:0}, M:{contacts:0,kg:0}, X:{contacts:0,kg:0}, J:{contacts:0,kg:0}, V:{contacts:0,kg:0}, S:{contacts:0,kg:0} };
+
     for (const r of records){
       if (!isValidOffice(r.office)) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (!passesZ3(r)) continue;
-      const dayArr = (viewMode === "Actual") ? r.days : (getProposalFields(r).proposedDays || []);
-      for (const d of dayArr){
-        const letter = dayNameToLetter[d];
-        if (letter && res[letter]){
-          res[letter].count++;
-          res[letter].kg += (r.kg || 0);
+
+      if (viewMode === "Actual"){
+        for (const d of r.days){
+          const letter = dayNameToLetter[d];
+          if (letter){
+            res[letter].contacts += 1;
+            res[letter].kg += (r.kg || 0);
+          }
         }
+      } else if (viewMode === "PropClie"){
+        for (const d of (r.proposedDaysClie || [])){
+          const letter = dayNameToLetter[d];
+          if (letter){
+            res[letter].contacts += 1;
+            res[letter].kg += (r.kg || 0);
+          }
+        }
+      } else {
+        const shares = getDaySharesKg(r);
+        shares.forEach(s => {
+          const letter = dayNameToLetter[s.day];
+          if (letter){
+            res[letter].contacts += s.contacts;
+            res[letter].kg += s.kg;
+          }
+        });
       }
     }
     return res;
@@ -402,7 +497,7 @@ function normalize(s){
       return `<div class="row">
         <span class="swatch" style="background:${color}"></span>
         ${escapeHtml(canal)}
-        <span class="pill">${info.count} clientes</span>
+        <span class="pill">${info.contacts.toFixed(0)} contactos</span>
         <span class="pill">${info.kg.toFixed(0)} kg</span>
       </div>`;
     }).join("");
@@ -412,10 +507,10 @@ function normalize(s){
 
     let header = "🎯 Atención actual";
     if (viewMode === "PropClie") header = "🧭 Propuesta clientes";
-    if (viewMode === "PropKg") header = "⚖️ Propuesta Kg + 3 días especiales";
+    if (viewMode === "PropKg") header = "⚖️ Prop. Kg + carga semanal";
     const z3 = filterZ3 ? `<span class="pill">+Z3</span>` : "";
     const specialTag = (viewMode === "PropKg")
-      ? `<div class="row"><span class="pill" style="color:#fde68a;">Especial 3 días</span> Miraflores · San Isidro</div>`
+      ? `<div class="row"><span class="pill" style="color:#fde68a;">3 días especial</span> Miraflores · San Isidro ya suman 3 contactos y 3x kg semanal</div>`
       : "";
 
     legendEl.innerHTML = `
@@ -425,22 +520,22 @@ function normalize(s){
         <span class="pill">Canal:</span> <span>${escapeHtml(selectedCanal)}</span>
       </div>
       ${specialTag}
-      <div style="margin:6px 0 4px; color:#9fb0c3;">Canales visibles (afectados por filtros)</div>
+      <div style="margin:6px 0 4px; color:#9fb0c3;">Canales visibles (carga semanal)</div>
       ${items || '<div class="row" style="color:#9fb0c3;">(Sin datos)</div>'}
       <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por parte (sin filtro de día)</div>
       <div class="row">
-        <span class="pill" style="color:#dbeafe;border-color:#2563eb55;">A</span> ${partSummary.A.count} · ${partSummary.A.kg.toFixed(0)} kg
-        <span class="pill" style="color:#fde68a;border-color:#f59e0b55;">B</span> ${partSummary.B.count} · ${partSummary.B.kg.toFixed(0)} kg
-        <span class="pill" style="color:#fbcfe8;border-color:#ec489955;">C</span> ${partSummary.C.count} · ${partSummary.C.kg.toFixed(0)} kg
+        <span class="pill" style="color:#dbeafe;border-color:#2563eb55;">A</span> ${partSummary.A.contacts.toFixed(0)} contactos · ${partSummary.A.kg.toFixed(1)} kg
+        <span class="pill" style="color:#fde68a;border-color:#f59e0b55;">B</span> ${partSummary.B.contacts.toFixed(0)} contactos · ${partSummary.B.kg.toFixed(1)} kg
+        <span class="pill" style="color:#fbcfe8;border-color:#ec489955;">C</span> ${partSummary.C.contacts.toFixed(0)} contactos · ${partSummary.C.kg.toFixed(1)} kg
       </div>
-      <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por día (sin filtro de día)</div>
+      <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por día</div>
       <div class="row">
-        L: <span class="pill">${daySummary.L.count}</span> <span class="pill">${daySummary.L.kg.toFixed(0)} kg</span>
-        M: <span class="pill">${daySummary.M.count}</span> <span class="pill">${daySummary.M.kg.toFixed(0)} kg</span>
-        X: <span class="pill">${daySummary.X.count}</span> <span class="pill">${daySummary.X.kg.toFixed(0)} kg</span>
-        J: <span class="pill">${daySummary.J.count}</span> <span class="pill">${daySummary.J.kg.toFixed(0)} kg</span>
-        V: <span class="pill">${daySummary.V.count}</span> <span class="pill">${daySummary.V.kg.toFixed(0)} kg</span>
-        S: <span class="pill">${daySummary.S.count}</span> <span class="pill">${daySummary.S.kg.toFixed(0)} kg</span>
+        L: <span class="pill">${daySummary.L.contacts.toFixed(0)}</span> <span class="pill">${daySummary.L.kg.toFixed(1)} kg</span>
+        M: <span class="pill">${daySummary.M.contacts.toFixed(0)}</span> <span class="pill">${daySummary.M.kg.toFixed(1)} kg</span>
+        X: <span class="pill">${daySummary.X.contacts.toFixed(0)}</span> <span class="pill">${daySummary.X.kg.toFixed(1)} kg</span>
+        J: <span class="pill">${daySummary.J.contacts.toFixed(0)}</span> <span class="pill">${daySummary.J.kg.toFixed(1)} kg</span>
+        V: <span class="pill">${daySummary.V.contacts.toFixed(0)}</span> <span class="pill">${daySummary.V.kg.toFixed(1)} kg</span>
+        S: <span class="pill">${daySummary.S.contacts.toFixed(0)}</span> <span class="pill">${daySummary.S.kg.toFixed(1)} kg</span>
       </div>
     `;
   }
@@ -610,7 +705,6 @@ function normalize(s){
         const bj = turf.bbox(fj);
         const bboxOverlap = !(bi[2] < bj[0] || bj[2] < bi[0] || bi[3] < bj[1] || bj[3] < bi[1]);
         if (!bboxOverlap) continue;
-
         let isAdj = false;
         try { isAdj = turf.booleanTouches(fi, fj); } catch(e){}
         if (isAdj){
@@ -695,7 +789,7 @@ function normalize(s){
       let bestMove = null;
 
       districtStats.forEach((d, featIdx) => {
-        if (SPECIAL_3DAY_DISTRICTS.has(d.name)) return; // estos se manejan aparte
+        if (SPECIAL_3DAY_DISTRICTS.has(d.name)) return;
 
         const fromPart = featurePartByIdxKg.get(featIdx);
         if (fromPart !== heavy) return;
@@ -717,7 +811,7 @@ function normalize(s){
           if (trialScore < currentScore){
             const delta = currentScore - trialScore;
             if (!bestMove || delta > bestMove.delta){
-              bestMove = { featIdx, distrito:d.label, fromPart, toPart, delta, trial };
+              bestMove = { featIdx, fromPart, toPart, delta, trial };
             }
           }
         });
@@ -725,130 +819,83 @@ function normalize(s){
 
       if (bestMove){
         featurePartByIdxKg = bestMove.trial;
-        audit.moved.push(bestMove);
         improved = true;
       }
     }
   }
 
-  function assignSpecial3DayDistricts(){
-    audit.totalsBeforeSpecial = summarizeSpecialTotals();
+  function getLightestNeighborPart(basePart, featIdx){
+    const neighParts = new Set();
+    (adjacency.get(featIdx) || new Set()).forEach(n => {
+      const p = featurePartByIdxKg.get(n);
+      if (p && p !== basePart) neighParts.add(p);
+    });
 
-    const specialRecords = records.filter(r => SPECIAL_3DAY_DISTRICTS.has(normalize(r.geoDistName)));
+    if (!neighParts.size) return basePart;
 
-    // limpiar primero
+    const totals = { A:{kg:0,count:0}, B:{kg:0,count:0}, C:{kg:0,count:0} };
     records.forEach(r => {
-      r.isSpecial3DayKg = false;
-      r.specialGroupKg = "";
-    });
-
-    // agrupar por distrito y dividir clientes por kg/alternancia
-    const grouped = {};
-    specialRecords.forEach(r => {
-      const key = normalize(r.geoDistName);
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(r);
-    });
-
-    Object.keys(grouped).forEach(dist => {
-      const arr = grouped[dist].sort((a,b)=>(b.kg || 0) - (a.kg || 0));
-      let g1Kg = 0, g2Kg = 0, g1Ct = 0, g2Ct = 0;
-
-      arr.forEach((r, idx) => {
-        const chooseG1 = (g1Kg < g2Kg) || (g1Kg === g2Kg && g1Ct <= g2Ct);
-        if (chooseG1){
-          r.specialGroupKg = "G1";
-          g1Kg += (r.kg || 0);
-          g1Ct += 1;
-        } else {
-          r.specialGroupKg = "G2";
-          g2Kg += (r.kg || 0);
-          g2Ct += 1;
-        }
-
-        r.isSpecial3DayKg = true;
-        r.proposedDaysKg = SPECIAL_3DAY_PATTERN.slice();
-        r.proposedLettersKg = SPECIAL_3DAY_LETTERS;
-
-        // conservamos la parte principal del distrito, pero alternamos algunos clientes
-        // hacia la parte más liviana vecina si existe; si no, se queda en su parte actual
-        const basePart = featurePartByIdxKg.get(r.featIdx) || r.partClie || "A";
-        const neighParts = new Set();
-        (adjacency.get(r.featIdx) || new Set()).forEach(n => {
-          const p = featurePartByIdxKg.get(n);
-          if (p && p !== basePart) neighParts.add(p);
-        });
-
-        let newPart = basePart;
-        if (r.specialGroupKg === "G2" && neighParts.size){
-          const totals = getCurrentClientPartTotalsForSpecial();
-          const opts = [...neighParts].sort((a,b)=>totals[a].kg - totals[b].kg || totals[a].count - totals[b].count);
-          if (opts[0]) newPart = opts[0];
-        }
-        r.partKg = newPart;
-      });
-
-      audit.special3day.push({
-        distrito: dist,
-        clientes: arr.length,
-        grupo1_clientes: g1Ct,
-        grupo1_kg: +g1Kg.toFixed(1),
-        grupo2_clientes: g2Ct,
-        grupo2_kg: +g2Kg.toFixed(1),
-        frecuencia: SPECIAL_3DAY_LETTERS
-      });
-    });
-
-    // para el color del polígono distrito dejamos la parte dominante por clientes
-    const byFeat = new Map();
-    records.forEach(r => {
-      if (r.partKg && r.featIdx != null){
-        if (!byFeat.has(r.featIdx)) byFeat.set(r.featIdx, {A:0,B:0,C:0});
-        byFeat.get(r.featIdx)[r.partKg] += 1;
+      const p = r.partKg || featurePartByIdxKg.get(r.featIdx);
+      if (p && totals[p]){
+        totals[p].kg += (r.kg || 0);
+        totals[p].count += 1;
       }
     });
 
-    featurePartByIdxKg = new Map(featurePartByIdxKg);
-    byFeat.forEach((counts, idx) => {
-      let maj="A", max=-1;
-      ["A","B","C"].forEach(p => {
-        if ((counts[p] || 0) > max){ max = counts[p] || 0; maj = p; }
-      });
-      featurePartByIdxKg.set(idx, maj);
-    });
-
-    audit.totalsAfterSpecial = summarizeSpecialTotals();
-  }
-
-  function getCurrentClientPartTotalsForSpecial(){
-    const totals = { A:{kg:0,count:0}, B:{kg:0,count:0}, C:{kg:0,count:0} };
-    records.forEach(r => {
-      const p = r.partKg || featurePartByIdxKg.get(r.featIdx);
-      if (!p || !totals[p]) return;
-      totals[p].kg += (r.kg || 0);
-      totals[p].count += 1;
-    });
-    return totals;
-  }
-
-  function summarizeSpecialTotals(){
-    const totals = { A:{kg:0,count:0}, B:{kg:0,count:0}, C:{kg:0,count:0} };
-    records.forEach(r => {
-      const p = r.partKg || featurePartByIdxKg.get(r.featIdx);
-      if (!p || !totals[p]) return;
-      totals[p].kg += (r.kg || 0);
-      totals[p].count += 1;
-    });
-    return totals;
+    return [...neighParts].sort((a,b)=>totals[a].kg - totals[b].kg || totals[a].count - totals[b].count)[0] || basePart;
   }
 
   function finalizeKgAssignments(){
     records.forEach(r => {
-      if (!r.isSpecial3DayKg){
-        const p = featurePartByIdxKg.get(r.featIdx) || r.partClie || "A";
-        r.partKg = p;
-        r.proposedDaysKg = partToDays[p];
-        r.proposedLettersKg = partToFreqLetters[p];
+      const p = featurePartByIdxKg.get(r.featIdx) || r.partClie || "A";
+      r.partKg = p;
+      r.partKgPrimary = p;
+      r.partKgSecondary = p;
+      r.proposedDaysKg = partToDays[p];
+      r.proposedLettersKg = partToFreqLetters[p];
+      r.isSpecial3DayKg = false;
+      r.specialGroupKg = "";
+    });
+  }
+
+  function assignSpecial3DayDistricts(){
+    const grouped = {};
+    records.forEach(r => {
+      const dn = normalize(r.geoDistName);
+      if (SPECIAL_3DAY_DISTRICTS.has(dn)){
+        if (!grouped[dn]) grouped[dn] = [];
+        grouped[dn].push(r);
+      }
+    });
+
+    Object.keys(grouped).forEach(dist => {
+      const arr = grouped[dist].sort((a,b)=>(b.kg || 0) - (a.kg || 0));
+
+      arr.forEach(r => {
+        const basePart = featurePartByIdxKg.get(r.featIdx) || r.partClie || "A";
+        const secondaryPart = getLightestNeighborPart(basePart, r.featIdx);
+
+        r.isSpecial3DayKg = true;
+        r.specialGroupKg = "3D";
+        r.proposedDaysKg = SPECIAL_3DAY_PATTERN.slice();
+        r.proposedLettersKg = SPECIAL_3DAY_LETTERS;
+        r.partKgPrimary = basePart;
+        r.partKgSecondary = secondaryPart;
+        r.partKg = basePart;
+      });
+
+      const featIdx = arr[0]?.featIdx;
+      if (featIdx != null){
+        const counts = {A:0,B:0,C:0};
+        arr.forEach(r => {
+          counts[r.partKgPrimary] = (counts[r.partKgPrimary] || 0) + 2;
+          counts[r.partKgSecondary] = (counts[r.partKgSecondary] || 0) + 1;
+        });
+        let maj="A", max=-1;
+        ["A","B","C"].forEach(p => {
+          if ((counts[p] || 0) > max){ max = counts[p] || 0; maj = p; }
+        });
+        featurePartByIdxKg.set(featIdx, maj);
       }
     });
   }
@@ -904,8 +951,8 @@ function normalize(s){
         kg,
         partClie:null, proposedDaysClie:[], proposedLettersClie:"",
         partKg:null, proposedDaysKg:[], proposedLettersKg:"",
-        isSpecial3DayKg:false,
-        specialGroupKg:""
+        partKgPrimary:null, partKgSecondary:null,
+        isSpecial3DayKg:false, specialGroupKg:""
       });
     }
 
@@ -924,20 +971,6 @@ function normalize(s){
     optimizeKgFromClie();
     finalizeKgAssignments();
     assignSpecial3DayDistricts();
-
-    if (ENABLE_AUDIT){
-      console.group("AUDITORIA PROP. KG 3 DIAS");
-      console.table(audit.moved.map(x => ({
-        distrito:x.distrito,
-        desde:x.fromPart,
-        hacia:x.toPart
-      })));
-      console.table(audit.special3day);
-      console.log("Totales antes especial", audit.totalsBeforeSpecial);
-      console.log("Totales después especial", audit.totalsAfterSpecial);
-      console.groupEnd();
-    }
-
     refreshLayers();
   }
 
@@ -946,8 +979,9 @@ function normalize(s){
     const headers = [
       "Codigo Cliente","Nombre Cliente","Distrito Catalogo","Distrito GeoJson",
       "Frecuencia Actual","Frecuencia Prop Clie","Frecuencia Prop Kg",
-      "Canal","Ruta","Latitud","Longitud","Oficina","Kg_Prom",
-      "Parte_Clie","Parte_Kg","Especial_3D","Grupo_3D"
+      "Canal","Ruta","Latitud","Longitud","Oficina","Kg_por_visita",
+      "Contactos_Semanales_PropKg","Kg_Semanales_PropKg",
+      "Parte_Clie","Parte_Kg","Parte_Kg_Principal","Parte_Kg_Secundaria","Especial_3D"
     ];
 const csv = [
   headers.join(",")
@@ -984,7 +1018,10 @@ const csv = [
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (filterZ3 && !r.hadZ3) continue;
       const pass = (selectedDay === "Todos") ? true :
-        (viewMode === "Actual" ? r.days.includes(selectedDay) : (getProposalFields(r).proposedDays || []).includes(selectedDay));
+        (viewMode === "Actual"
+          ? r.days.includes(selectedDay)
+          : (getProposalFields(r).proposedDays || []).includes(selectedDay)
+        );
       if (!pass) continue;
       out.push(r);
     }
