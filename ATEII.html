@@ -68,8 +68,8 @@
  .btn:hover{ filter:brightness(1.12); }
  #map{ height: calc(100vh - 86px); }
  .legend{
-  position:absolute; bottom:12px; left:12px; z-index:600; background:var(--md-surface);
-  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width:440px; box-shadow:var(--elev);
+  position:absolute; bottom:12px; left:12px; z-index:600; background:rgba(15,21,32,.94);
+  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width:445px; box-shadow:var(--elev);
   backdrop-filter: blur(8px);
  }
  .legend h4{ margin:0 0 4px 0; font-size:12px; }
@@ -173,17 +173,8 @@
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
 
-  // nueva paleta más contrastada
-  const partColors = {
-    A:"#2563eb", // azul
-    B:"#f59e0b", // ámbar
-    C:"#ec4899"  // fucsia
-  };
-  const partFill = {
-    A:"#3b82f6",
-    B:"#fbbf24",
-    C:"#f472b6"
-  };
+  const partColors = { A:"#2563eb", B:"#f59e0b", C:"#ec4899" };
+  const partFill   = { A:"#60a5fa", B:"#fbbf24", C:"#f472b6" };
 
   let viewMode = "Actual";
   let selectedDay = "Todos";
@@ -206,25 +197,14 @@
   let records = [];
   let featurePartByIdxClie = new Map();
   let featurePartByIdxKg = new Map();
-  let channelPalette = {};
   let kgByCode = new Map();
-  let districtOrder = [];
+  let adjacency = new Map();
+  let districtStats = new Map();
 
-function normalize(s){
-  try {
-    return (s ?? "")
-      .toString()
-      .normalize("NFD")
-      .replace(/\p{Diacritic}/gu, "")
-      .toUpperCase()
-      .trim();
-  } catch (e) {
-    return (s ?? "")
-      .toString()
-      .toUpperCase()
-      .trim();
+  function normalize(s){
+    try { return (s ?? "").toString().normalize("NFD").replace(/p{Diacritic}/gu, "").toUpperCase().trim(); }
+    catch(e){ return (s ?? "").toString().toUpperCase().trim(); }
   }
-}
   function normalizeName(s){ return normalize(s).replace(/s+/g,' '); }
   function num(s){ if (s == null) return NaN; const t = s.toString().replace(",", "."); const v = parseFloat(t); return Number.isFinite(v) ? v : NaN; }
 
@@ -269,6 +249,7 @@ function normalize(s){
   }
 
   const baseColors = ["#22c55e","#eab308","#06b6d4","#f97316","#a855f7","#ef4444","#14b8a6","#f43f5e","#84cc16","#e879f9","#60a5fa","#f59e0b","#10b981","#8b5cf6"];
+  const channelPalette = {};
   function colorForChannel(canal){
     if (!canal) return "#6b7280";
     if (channelPalette[canal]) return channelPalette[canal];
@@ -286,6 +267,16 @@ function normalize(s){
       .replace(/'/g,  "&#39;");
   }
 
+  function isValidOffice(office){
+    const oNorm = normalize(office);
+    return (
+      (oNorm === "OFIC ATE" && filterOffices.has("OFIC ATE")) ||
+      (oNorm === "OFIC CHORRILLOS" && filterOffices.has("OFIC CHORRILLOS"))
+    );
+  }
+
+  function passesZ3(r){ return !(filterZ3 && !r.hadZ3); }
+
   function getProposalFields(r){
     if (viewMode === "PropClie"){
       return { part: r.partClie, proposedDays: r.proposedDaysClie, proposedLetters: r.proposedLettersClie };
@@ -294,16 +285,6 @@ function normalize(s){
       return { part: r.partKg, proposedDays: r.proposedDaysKg, proposedLetters: r.proposedLettersKg };
     }
     return { part:null, proposedDays:[], proposedLetters:"" };
-  }
-
-  function passesZ3(r){ return !(filterZ3 && !r.hadZ3); }
-
-  function isValidOffice(office){
-    const oNorm = normalize(office);
-    return (
-      (oNorm === "OFIC ATE" && filterOffices.has("OFIC ATE")) ||
-      (oNorm === "OFIC CHORRILLOS" && filterOffices.has("OFIC CHORRILLOS"))
-    );
   }
 
   function buildPopUp(r){
@@ -408,7 +389,7 @@ function normalize(s){
 
     let header = "🎯 Atención actual";
     if (viewMode === "PropClie") header = "🧭 Propuesta clientes";
-    if (viewMode === "PropKg") header = "⚖️ Propuesta Kg ajustada";
+    if (viewMode === "PropKg") header = "⚖️ Propuesta Kg con adyacencia";
     const z3 = filterZ3 ? `<span class="pill">+Z3</span>` : "";
 
     legendEl.innerHTML = `
@@ -456,6 +437,7 @@ function normalize(s){
     districtsLayerHolder.clearLayers();
     if (!areaFeatures) return;
     areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
+
     const layer = L.geoJSON(areaFeatures, {
       pane:'zonesPane',
       style: (feature) => {
@@ -464,12 +446,7 @@ function normalize(s){
         if (viewMode === "PropClie") part = featurePartByIdxClie.get(idx);
         else if (viewMode === "PropKg") part = featurePartByIdxKg.get(idx);
         if (part){
-          return {
-            color: partColors[part],
-            weight: 2.2,
-            fillColor: partFill[part],
-            fillOpacity: 0.22
-          };
+          return { color: partColors[part], weight: 2.2, fillColor: partFill[part], fillOpacity: 0.22 };
         }
         return { color:'#ef4444', weight:1, fillOpacity:0 };
       },
@@ -523,6 +500,30 @@ function normalize(s){
     fitToContent();
   }
 
+  function populateCanalFilter(canalList){
+    const sel = document.getElementById('canalFilter');
+    const uniq = Array.from(new Set(canalList));
+    sel.innerHTML = `<option value="Todos">Todos</option>` + uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  }
+
+  function buildDistrictStats(){
+    districtStats = new Map();
+    for (const r of records){
+      if (r.featIdx == null) continue;
+      if (!districtStats.has(r.featIdx)){
+        districtStats.set(r.featIdx, {
+          featIdx: r.featIdx,
+          name: normalize(r.geoDistName),
+          kg: 0,
+          count: 0
+        });
+      }
+      const d = districtStats.get(r.featIdx);
+      d.kg += (r.kg || 0);
+      d.count += 1;
+    }
+  }
+
   function assignPartsClie(){
     const sorted = [...records].sort((a,b)=>a.lon - b.lon);
     const n = sorted.length; if (n === 0) return;
@@ -562,129 +563,187 @@ function normalize(s){
     }
   }
 
-  function buildDistrictOrderAndStats(){
-    const byFeat = new Map();
-    for (const r of records){
-      if (r.featIdx == null) continue;
-      if (!byFeat.has(r.featIdx)) byFeat.set(r.featIdx, {kg:0, count:0});
-      byFeat.get(r.featIdx).kg += (r.kg || 0);
-      byFeat.get(r.featIdx).count += 1;
+  function buildAdjacency(){
+    adjacency = new Map();
+    if (!areaFeatures?.features?.length) return;
+
+    const feats = areaFeatures.features;
+    for (let i=0; i<feats.length; i++) adjacency.set(i, new Set());
+
+    for (let i=0; i<feats.length; i++){
+      const fi = feats[i];
+      const bi = turf.bbox(fi);
+      for (let j=i+1; j<feats.length; j++){
+        const fj = feats[j];
+        const bj = turf.bbox(fj);
+
+        const bboxOverlap = !(bi[2] < bj[0] || bj[2] < bi[0] || bi[3] < bj[1] || bj[3] < bi[1]);
+        if (!bboxOverlap) continue;
+
+        let isAdj = false;
+        try {
+          isAdj = turf.booleanTouches(fi, fj);
+          if (!isAdj){
+            const inter = turf.intersect(turf.featureCollection([fi, fj]));
+            isAdj = !!inter;
+          }
+        } catch(e){}
+
+        if (isAdj){
+          adjacency.get(i).add(j);
+          adjacency.get(j).add(i);
+        }
+      }
     }
-
-    districtOrder = [];
-    byFeat.forEach((val, idx) => {
-      const feat = areaFeatures.features[idx];
-      let cx = 0, cy = 0;
-      try {
-        const cent = turf.centroid(feat);
-        cx = cent.geometry.coordinates[0];
-        cy = cent.geometry.coordinates[1];
-      } catch(e){}
-      districtOrder.push({
-        featIdx: idx,
-        name: normalize(getFeatureDistName(feat)),
-        kg: val.kg,
-        count: val.count,
-        cx, cy
-      });
-    });
-
-    districtOrder.sort((a,b)=>{
-      if (a.cx === b.cx) return a.cy - b.cy;
-      return a.cx - b.cx;
-    });
   }
 
   function getPartTotals(partMap){
-    const totals = {A:0,B:0,C:0};
-    districtOrder.forEach(d => {
-      const p = partMap.get(d.featIdx);
-      if (p) totals[p] += d.kg;
+    const totals = {
+      A:{kg:0,count:0},
+      B:{kg:0,count:0},
+      C:{kg:0,count:0}
+    };
+    districtStats.forEach((d, idx) => {
+      const p = partMap.get(idx);
+      if (!p || !totals[p]) return;
+      totals[p].kg += d.kg;
+      totals[p].count += d.count;
     });
     return totals;
   }
 
-  function spreadScore(t){
-    const vals = [t.A, t.B, t.C];
-    return Math.max(...vals) - Math.min(...vals);
+  function scoreTotals(totals){
+    const kgVals = [totals.A.kg, totals.B.kg, totals.C.kg];
+    const ctVals = [totals.A.count, totals.B.count, totals.C.count];
+    const kgSpread = Math.max(...kgVals) - Math.min(...kgVals);
+    const ctSpread = Math.max(...ctVals) - Math.min(...ctVals);
+    return kgSpread + (ctSpread * 35);
+  }
+
+  function getDistrictsOfPart(partMap, part){
+    const arr = [];
+    partMap.forEach((p, idx) => { if (p === part) arr.push(idx); });
+    return arr;
+  }
+
+  function isConnectedPart(partMap, part){
+    const nodes = getDistrictsOfPart(partMap, part);
+    if (nodes.length <= 1) return true;
+
+    const nodeSet = new Set(nodes);
+    const visited = new Set();
+    const stack = [nodes[0]];
+    visited.add(nodes[0]);
+
+    while (stack.length){
+      const cur = stack.pop();
+      const neigh = adjacency.get(cur) || new Set();
+      neigh.forEach(n => {
+        if (nodeSet.has(n) && !visited.has(n)){
+          visited.add(n);
+          stack.push(n);
+        }
+      });
+    }
+    return visited.size === nodeSet.size;
+  }
+
+  function canMoveDistrict(partMap, featIdx, fromPart, toPart){
+    const neigh = adjacency.get(featIdx) || new Set();
+    let touchesTo = false;
+    neigh.forEach(n => {
+      if (partMap.get(n) === toPart) touchesTo = true;
+    });
+    if (!touchesTo) return false;
+
+    const trial = new Map(partMap);
+    trial.set(featIdx, toPart);
+
+    return isConnectedPart(trial, fromPart) && isConnectedPart(trial, toPart);
   }
 
   function findDistrictByName(nameNorm){
-    return districtOrder.find(d => d.name === nameNorm);
+    let found = null;
+    districtStats.forEach((d, idx) => {
+      if (d.name === nameNorm) found = { ...d, featIdx: idx };
+    });
+    return found;
   }
 
-  function applyMirafloresSanIsidroSplit(partMap){
+  function trySplitMirafloresSanIsidro(partMap){
     const mir = findDistrictByName("MIRAFLORES");
     const san = findDistrictByName("SAN ISIDRO");
-    if (!mir || !san) return;
+    if (!mir || !san) return partMap;
 
     const pm = partMap.get(mir.featIdx);
     const ps = partMap.get(san.featIdx);
-
-    if (pm !== ps) return;
+    if (pm !== ps) return partMap;
 
     const totals = getPartTotals(partMap);
-    const candidates = ["A","B","C"].filter(p => p !== pm).sort((a,b)=>totals[a]-totals[b]);
-    if (!candidates.length) return;
+    const options = ["A","B","C"].filter(p => p !== pm).sort((a,b)=>totals[a].kg - totals[b].kg);
+    const firstTarget = options[0];
+    if (!firstTarget) return partMap;
 
-    // mueve el distrito más liviano de los dos
-    if (mir.kg <= san.kg) partMap.set(mir.featIdx, candidates[0]);
-    else partMap.set(san.featIdx, candidates[0]);
+    const lighter = (mir.kg <= san.kg) ? mir : san;
+    if (canMoveDistrict(partMap, lighter.featIdx, pm, firstTarget)){
+      const trial = new Map(partMap);
+      trial.set(lighter.featIdx, firstTarget);
+      return trial;
+    }
+    return partMap;
   }
 
   function optimizeKgFromClie(){
     featurePartByIdxKg = new Map(featurePartByIdxClie);
+    featurePartByIdxKg = trySplitMirafloresSanIsidro(featurePartByIdxKg);
 
-    buildDistrictOrderAndStats();
-
-    // 1) intento especial: separar Miraflores y San Isidro
-    applyMirafloresSanIsidroSplit(featurePartByIdxKg);
-
-    // 2) pequeños ajustes locales basados en la propuesta cliente
     let improved = true;
     let guard = 0;
 
-    while (improved && guard < 12){
-      guard++;
+    while (improved && guard < 30){
       improved = false;
+      guard++;
 
       const totals = getPartTotals(featurePartByIdxKg);
-      const partsSorted = ["A","B","C"].sort((a,b)=>totals[b]-totals[a]);
-      const heavy = partsSorted[0];
-      const light = partsSorted[2];
-      const currentScore = spreadScore(totals);
+      const currentScore = scoreTotals(totals);
+      const sortedParts = ["A","B","C"].sort((a,b)=>totals[b].kg - totals[a].kg || totals[b].count - totals[a].count);
+      const heavy = sortedParts[0];
 
-      for (let i=0; i<districtOrder.length; i++){
-        const d = districtOrder[i];
-        const currentPart = featurePartByIdxKg.get(d.featIdx);
-        if (currentPart !== heavy) continue;
+      let bestMove = null;
 
-        const prev = districtOrder[i-1];
-        const next = districtOrder[i+1];
+      districtStats.forEach((d, featIdx) => {
+        const fromPart = featurePartByIdxKg.get(featIdx);
+        if (fromPart !== heavy) return;
 
-        // solo distritos cercanos a borde de cambio o distritos pequeños/moderados
-        const isBoundary =
-          (prev && featurePartByIdxKg.get(prev.featIdx) !== currentPart) ||
-          (next && featurePartByIdxKg.get(next.featIdx) !== currentPart);
+        const neighParts = new Set();
+        (adjacency.get(featIdx) || new Set()).forEach(n => {
+          const p = featurePartByIdxKg.get(n);
+          if (p && p !== fromPart) neighParts.add(p);
+        });
 
-        if (!isBoundary && d.kg > 0.18 * Math.max(totals.A, totals.B, totals.C)) continue;
+        neighParts.forEach(toPart => {
+          if (!canMoveDistrict(featurePartByIdxKg, featIdx, fromPart, toPart)) return;
 
-        const trial = new Map(featurePartByIdxKg);
-        trial.set(d.featIdx, light);
+          const trial = new Map(featurePartByIdxKg);
+          trial.set(featIdx, toPart);
+          const trialTotals = getPartTotals(trial);
+          const trialScore = scoreTotals(trialTotals);
 
-        const newTotals = getPartTotals(trial);
-        const newScore = spreadScore(newTotals);
+          if (trialScore < currentScore){
+            const delta = currentScore - trialScore;
+            if (!bestMove || delta > bestMove.delta){
+              bestMove = { featIdx, fromPart, toPart, delta, trial };
+            }
+          }
+        });
+      });
 
-        // aceptar solo si mejora
-        if (newScore < currentScore){
-          featurePartByIdxKg = trial;
-          improved = true;
-          break;
-        }
+      if (bestMove){
+        featurePartByIdxKg = bestMove.trial;
+        improved = true;
       }
     }
 
-    // bajar al nivel cliente
     for (const r of records){
       const p = featurePartByIdxKg.get(r.featIdx) || r.partClie || "A";
       r.partKg = p;
@@ -757,15 +816,10 @@ function normalize(s){
 
     records = deduped;
     populateCanalFilter(records.map(r=>r.canal).filter(Boolean));
+    buildDistrictStats();
     assignPartsClie();
     optimizeKgFromClie();
     refreshLayers();
-  }
-
-  function populateCanalFilter(canalList){
-    const sel = document.getElementById('canalFilter');
-    const uniq = Array.from(new Set(canalList));
-    sel.innerHTML = `<option value="Todos">Todos</option>` + uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
   }
 
   document.getElementById('exportBtn').addEventListener('click', ()=>{
@@ -776,28 +830,14 @@ function normalize(s){
       "Canal","Ruta","Latitud","Longitud","Oficina","Kg_Prom",
       "Parte_Clie","Parte_Kg"
     ];
-const csv = [
-  headers.join(",")
-].concat(
-  rows.map(r => [
-    r.code,
-    r.name,
-    r.distrito,
-    r.geoDistName,
-    r.freqLetters ?? "",
-    r.proposedClieLetters ?? "",
-    r.proposedKgLetters ?? "",
-    r.canal ?? "",
-    r.route ?? "",
-    r.lat,
-    r.lon,
-    r.office ?? "",
-    r.volume ?? 0,      // antes estaba r.kg
-    r.partClie ?? "",
-    r.partKg ?? ""
-  ].map(csvEscape).join(","))
-).join("\r\n");
-
+    const csv = [headers].concat(rows.map(r => [
+      r.code, r.name, r.distrito, r.geoDistName, r.freqLetters || "",
+      r.proposedLettersClie || "", r.proposedLettersKg || "",
+      r.canal || "", r.route || "",
+      r.lat, r.lon, r.office || "", r.kg || 0,
+      r.partClie || "", r.partKg || ""
+    ].map(v => csvEscape(v)).join(","))).join("
+");
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -819,14 +859,12 @@ const csv = [
     return out;
   }
 
-function csvEscape(v){
-  const s = (v ?? "").toString();
-  // Si contiene comas, comillas o saltos de línea → encerrar y escapar
-  if (/[",\r\n]/.test(s)){
-    return `"${s.replace(/"/g, '""')}"`;
+  function csvEscape(v){
+    const s = (v ?? "").toString();
+    if (/[",
+]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+    return s;
   }
-  return s;
-}
 
   document.getElementById('viewTabs').addEventListener('click', (e)=>{
     if (e.target.tagName === "BUTTON"){
@@ -858,6 +896,7 @@ function csvEscape(v){
       areaFeatures = (geo && geo.type === "FeatureCollection") ? geo : { type:"FeatureCollection", features: [geo] };
       areaFeatures.features.forEach((f,i)=>{ if(!f.properties) f.properties={}; f.properties.__idx=i; });
       boundaryLayer.addData(areaFeatures);
+      buildAdjacency();
       try { const b=boundaryLayer.getBounds(); if (b && b.isValid()) map.fitBounds(b.pad(0.05)); } catch(e){}
 
       Papa.parse(VOL_URL, {
@@ -901,7 +940,6 @@ function csvEscape(v){
       console.error("No se pudo cargar el GeoJSON:", err);
       alert("No se pudo cargar el GeoJSON de límites.");
     });
-
 })();
 </script>
 </body>
