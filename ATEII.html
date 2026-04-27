@@ -1115,30 +1115,34 @@
       "Parte_Clie","Subparte_Clie","Parte_Kg","Subparte_Kg"
     ];
 
-    const csv = [
-      headers.join(",")
-    ].concat(
-      rows.map(r => [
-        r.code,
-        r.name,
-        r.distrito,
-        r.geoDistName,
-        r.freqLetters ?? "",
-        r.proposedLettersClie ?? "",
-        r.proposedLettersKg ?? "",
-        r.canal ?? "",
-        r.route ?? "",
-        r.lat,
-        r.lon,
-        r.office ?? "",
-        r.kg ?? 0,
-        r.partClie ?? "",
-        r.subpartClie ?? "",
-        r.partKg ?? "",
-        r.subpartKg ?? ""
-      ].map(csvEscape).join(","))
-    ).join("
-");
+  const csv = [
+  headers.join(",")
+].concat(
+  rows.map(r =>
+    [
+      r.code,
+      r.name,
+      r.distrito,
+      r.geoDistName,
+      r.freqLetters ?? "",
+      r.proposedLettersClie ?? "",
+      r.proposedLettersKg ?? "",
+      r.canal ?? "",
+      r.route ?? "",
+      r.lat,
+      r.lon,
+      r.office ?? "",
+      r.kg ?? 0,
+      r.partClie ?? "",
+      r.subpartClie ?? "",
+      r.partKg ?? "",
+      r.subpartKg ?? ""
+    ]
+      .map(csvEscape)
+      .join(",")
+  )
+).join("\n");
+
 
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
