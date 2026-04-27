@@ -69,7 +69,7 @@
  #map{ height: calc(100vh - 86px); }
  .legend{
   position:absolute; bottom:12px; left:12px; z-index:600; background:rgba(15,21,32,.94);
-  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width:460px; box-shadow:var(--elev);
+  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width:520px; box-shadow:var(--elev);
   backdrop-filter: blur(8px);
  }
  .legend h4{ margin:0 0 4px 0; font-size:12px; }
@@ -173,14 +173,11 @@
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
 
-  // Paleta más distinguible
-  const partColors = { A:"#2563eb", B:"#f59e0b", C:"#ec4899" };
-  const partFill   = { A:"#60a5fa", B:"#fbbf24", C:"#f472b6" };
+  const basePartColors = { A:"#2563eb", B:"#f59e0b", C:"#ec4899" };
 
-  // Ajustes de optimización
   const KG_WEIGHT = 1.0;
-  const CLIENT_WEIGHT = 8.0;      // antes estaba implícitamente muy alto; ahora es más suave
-  const KG_PRIORITY_FACTOR = 1.15; // favorece cambios que mejoran kg con claridad
+  const CLIENT_WEIGHT = 8.0;
+  const KG_PRIORITY_FACTOR = 1.15;
   const MAX_ITERS = 40;
   const ENABLE_AUDIT = true;
 
@@ -205,6 +202,8 @@
   let records = [];
   let featurePartByIdxClie = new Map();
   let featurePartByIdxKg = new Map();
+  let featureSubpartByIdxClie = new Map();
+  let featureSubpartByIdxKg = new Map();
   let kgByCode = new Map();
   let adjacency = new Map();
   let districtStats = new Map();
@@ -219,16 +218,25 @@
     finalTotals: null
   };
 
-function normalize(s){
-  return (s ?? "")
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .trim();
-}
-  function normalizeName(s){ return normalize(s).replace(/s+/g,' '); }
-  function num(s){ if (s == null) return NaN; const t = s.toString().replace(",", "."); const v = parseFloat(t); return Number.isFinite(v) ? v : NaN; }
+  function normalize(s){
+    return (s ?? "")
+      .toString()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toUpperCase()
+      .trim();
+  }
+
+  function normalizeName(s){
+    return normalize(s).replace(/s+/g,' ');
+  }
+
+  function num(s){
+    if (s == null) return NaN;
+    const t = s.toString().replace(",", ".");
+    const v = parseFloat(t);
+    return Number.isFinite(v) ? v : NaN;
+  }
 
   function hasHeader(row){
     const a = num(row[28]), b = num(row[29]);
@@ -251,11 +259,75 @@ function normalize(s){
       .map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
   }
 
+  function swapMainPart(part){
+    if (part === "A") return "C";
+    if (part === "C") return "A";
+    return "B";
+  }
+
+  function swapSubpartLabel(sub){
+    if (!sub || sub.length < 2) return sub;
+    const main = sub[0];
+    const idx = sub.slice(1);
+    return `${swapMainPart(main)}${idx}`;
+  }
+
+  function hexToRgb(hex){
+    const h = hex.replace('#','');
+    return {
+      r: parseInt(h.substring(0,2),16),
+      g: parseInt(h.substring(2,4),16),
+      b: parseInt(h.substring(4,6),16)
+    };
+  }
+
+  function rgbToHex(r,g,b){
+    return "#" + [r,g,b].map(v => {
+      const x = Math.max(0, Math.min(255, Math.round(v)));
+      return x.toString(16).padStart(2,'0');
+    }).join('');
+  }
+
+  function mixColor(hex, targetHex, amount){
+    const a = hexToRgb(hex);
+    const b = hexToRgb(targetHex);
+    return rgbToHex(
+      a.r + (b.r - a.r) * amount,
+      a.g + (b.g - a.g) * amount,
+      a.b + (b.b - a.b) * amount
+    );
+  }
+
+  function getSubpartStyle(subpart){
+    if (!subpart) return { color:'#ef4444', fillColor:'#ef4444', fillOpacity:0.08 };
+    const main = subpart[0];
+    const suffix = subpart.slice(1);
+    const base = basePartColors[main] || '#6b7280';
+
+    if (suffix === "1"){
+      return {
+        color: mixColor(base, "#ffffff", 0.10),
+        fillColor: mixColor(base, "#ffffff", 0.22),
+        fillOpacity: 0.28
+      };
+    }
+
+    return {
+      color: mixColor(base, "#000000", 0.10),
+      fillColor: mixColor(base, "#ffffff", 0.08),
+      fillOpacity: 0.18
+    };
+  }
+
   const DIST_KEYS = ["NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist","nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"];
   function getFeatureDistName(f){
     const p = f?.properties || {};
-    for (const k of DIST_KEYS){ if (p[k] && typeof p[k] === "string" && p[k].trim().length) return p[k].trim(); }
-    for (const k in p){ if (typeof p[k] === "string" && p[k].trim().length) return p[k].trim(); }
+    for (const k of DIST_KEYS){
+      if (p[k] && typeof p[k] === "string" && p[k].trim().length) return p[k].trim();
+    }
+    for (const k in p){
+      if (typeof p[k] === "string" && p[k].trim().length) return p[k].trim();
+    }
     return "Distrito";
   }
 
@@ -275,9 +347,11 @@ function normalize(s){
   function colorForChannel(canal){
     if (!canal) return "#6b7280";
     if (channelPalette[canal]) return channelPalette[canal];
-    let h=0; for(let i=0;i<canal.length;i++) h=(h*31 + canal.charCodeAt(i))>>>0;
+    let h=0;
+    for(let i=0;i<canal.length;i++) h=(h*31 + canal.charCodeAt(i))>>>0;
     const color = baseColors[h % baseColors.length];
-    channelPalette[canal] = color; return color;
+    channelPalette[canal] = color;
+    return color;
   }
 
   function escapeHtml(str) {
@@ -297,16 +371,28 @@ function normalize(s){
     );
   }
 
-  function passesZ3(r){ return !(filterZ3 && !r.hadZ3); }
+  function passesZ3(r){
+    return !(filterZ3 && !r.hadZ3);
+  }
 
   function getProposalFields(r){
     if (viewMode === "PropClie"){
-      return { part: r.partClie, proposedDays: r.proposedDaysClie, proposedLetters: r.proposedLettersClie };
+      return {
+        part: r.partClie,
+        subpart: r.subpartClie,
+        proposedDays: r.proposedDaysClie,
+        proposedLetters: r.proposedLettersClie
+      };
     }
     if (viewMode === "PropKg"){
-      return { part: r.partKg, proposedDays: r.proposedDaysKg, proposedLetters: r.proposedLettersKg };
+      return {
+        part: r.partKg,
+        subpart: r.subpartKg,
+        proposedDays: r.proposedDaysKg,
+        proposedLetters: r.proposedLettersKg
+      };
     }
-    return { part:null, proposedDays:[], proposedLetters:"" };
+    return { part:null, subpart:null, proposedDays:[], proposedLetters:"" };
   }
 
   function buildPopUp(r){
@@ -322,7 +408,7 @@ function normalize(s){
     if (viewMode === "PropClie") lblProp = "Prop. Clie";
     if (viewMode === "PropKg") lblProp = "Prop. Kg";
     return `
-      <div style="min-width:275px; line-height:1.3;">
+      <div style="min-width:285px; line-height:1.3;">
         <div class="popup-line" style="font-weight:800; font-size:14px;">Cliente: ${escapeHtml(r.code)}</div>
         <div class="popup-line"><strong>Nombre:</strong> ${escapeHtml(r.name || "")}</div>
         <div class="popup-line"><strong>Canal:</strong> ${escapeHtml(r.canal || "")}</div>
@@ -333,6 +419,7 @@ function normalize(s){
         <div class="popup-line"><strong>Frecuencia actual:</strong> <span class="freq">${freqNow}</span></div>
         <div class="popup-line"><strong>${lblProp}:</strong> <span class="freq">${freqProp}</span> <span class="popup-muted">(${escapeHtml(proposedDaysStr)})</span></div>
         <div class="popup-line"><strong>Parte:</strong> ${prop.part ?? "—"} <span class="popup-muted">(${escapeHtml(partDays)})</span></div>
+        <div class="popup-line"><strong>Subparte:</strong> ${prop.subpart ?? "—"}</div>
         <div class="popup-line"><strong>Ruta:</strong> ${escapeHtml(r.route || "")}</div>
         <div class="popup-line" style="margin-top:6px;">
           <a href="${gm}" target="_blank" rel="noopener noreferrer">Abrir en Google Maps ↗</a>
@@ -347,9 +434,11 @@ function normalize(s){
       if (!isValidOffice(r.office)) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (!passesZ3(r)) continue;
+
       const pass = (selectedDay === "Todos") ? true :
         (viewMode === "Actual" ? r.days.includes(selectedDay) : (getProposalFields(r).proposedDays || []).includes(selectedDay));
       if (!pass) continue;
+
       const key = r.canal || "Sin canal";
       if (!out[key]) out[key] = {count:0, kg:0};
       out[key].count++;
@@ -359,16 +448,21 @@ function normalize(s){
   }
 
   function partSummaryWithFilters(){
-    const res = { A:{count:0,kg:0}, B:{count:0,kg:0}, C:{count:0,kg:0} };
+    const res = {
+      A1:{count:0,kg:0}, A2:{count:0,kg:0},
+      B1:{count:0,kg:0}, B2:{count:0,kg:0},
+      C1:{count:0,kg:0}, C2:{count:0,kg:0}
+    };
     if (viewMode === "Actual") return res;
+
     for (const r of records){
       if (!isValidOffice(r.office)) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (!passesZ3(r)) continue;
       const prop = getProposalFields(r);
-      if (prop.part && res[prop.part]){
-        res[prop.part].count++;
-        res[prop.part].kg += (r.kg || 0);
+      if (prop.subpart && res[prop.subpart]){
+        res[prop.subpart].count++;
+        res[prop.subpart].kg += (r.kg || 0);
       }
     }
     return res;
@@ -380,6 +474,7 @@ function normalize(s){
       if (!isValidOffice(r.office)) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (!passesZ3(r)) continue;
+
       const dayArr = (viewMode === "Actual") ? r.days : (getProposalFields(r).proposedDays || []);
       for (const d of dayArr){
         const letter = dayNameToLetter[d];
@@ -406,7 +501,7 @@ function normalize(s){
       </div>`;
     }).join("");
 
-    const partSummary = partSummaryWithFilters();
+    const subSummary = partSummaryWithFilters();
     const daySummary = daySummaryWithFilters();
 
     let header = "🎯 Atención actual";
@@ -422,11 +517,14 @@ function normalize(s){
       </div>
       <div style="margin:6px 0 4px; color:#9fb0c3;">Canales visibles (afectados por filtros)</div>
       ${items || '<div class="row" style="color:#9fb0c3;">(Sin datos)</div>'}
-      <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por parte (sin filtro de día)</div>
+      <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por subparte (sin filtro de día)</div>
       <div class="row">
-        <span class="pill" style="color:#dbeafe;border-color:#2563eb55;">A</span> ${partSummary.A.count} · ${partSummary.A.kg.toFixed(0)} kg
-        <span class="pill" style="color:#fde68a;border-color:#f59e0b55;">B</span> ${partSummary.B.count} · ${partSummary.B.kg.toFixed(0)} kg
-        <span class="pill" style="color:#fbcfe8;border-color:#ec489955;">C</span> ${partSummary.C.count} · ${partSummary.C.kg.toFixed(0)} kg
+        <span class="pill">A1</span> ${subSummary.A1.count} · ${subSummary.A1.kg.toFixed(0)} kg
+        <span class="pill">A2</span> ${subSummary.A2.count} · ${subSummary.A2.kg.toFixed(0)} kg
+        <span class="pill">B1</span> ${subSummary.B1.count} · ${subSummary.B1.kg.toFixed(0)} kg
+        <span class="pill">B2</span> ${subSummary.B2.count} · ${subSummary.B2.kg.toFixed(0)} kg
+        <span class="pill">C1</span> ${subSummary.C1.count} · ${subSummary.C1.kg.toFixed(0)} kg
+        <span class="pill">C2</span> ${subSummary.C2.count} · ${subSummary.C2.kg.toFixed(0)} kg
       </div>
       <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por día (sin filtro de día)</div>
       <div class="row">
@@ -464,11 +562,18 @@ function normalize(s){
       pane:'zonesPane',
       style: (feature) => {
         const idx = feature.properties.__idx;
-        let part = null;
-        if (viewMode === "PropClie") part = featurePartByIdxClie.get(idx);
-        else if (viewMode === "PropKg") part = featurePartByIdxKg.get(idx);
-        if (part){
-          return { color: partColors[part], weight: 2.2, fillColor: partFill[part], fillOpacity: 0.22 };
+        let subpart = null;
+        if (viewMode === "PropClie") subpart = featureSubpartByIdxClie.get(idx);
+        else if (viewMode === "PropKg") subpart = featureSubpartByIdxKg.get(idx);
+
+        if (subpart){
+          const st = getSubpartStyle(subpart);
+          return {
+            color: st.color,
+            weight: 2.2,
+            fillColor: st.fillColor,
+            fillOpacity: st.fillOpacity
+          };
         }
         return { color:'#ef4444', weight:1, fillOpacity:0 };
       },
@@ -500,8 +605,12 @@ function normalize(s){
         const color = colorForChannel(r.canal || "");
         const marker = L.circleMarker([r.lat, r.lon], {
           pane:'markersPane',
-          radius:5.8, stroke:true, weight:1, color:"#0b1221",
-          fillColor: color, fillOpacity:0.95
+          radius:5.8,
+          stroke:true,
+          weight:1,
+          color:"#0b1221",
+          fillColor: color,
+          fillOpacity:0.95
         }).bindPopup(buildPopUp(r));
 
         if (viewMode === "Actual") currentLayer.addLayer(marker);
@@ -547,45 +656,6 @@ function normalize(s){
     }
   }
 
-  function assignPartsClie(){
-    const sorted = [...records].sort((a,b)=>a.lon - b.lon);
-    const n = sorted.length; if (n === 0) return;
-    const size = Math.ceil(n / 3), cut1 = size, cut2 = size * 2;
-
-    for (let i=0; i<n; i++){
-      const r = sorted[i];
-      r.partClie = (i < cut1) ? "A" : (i < cut2 ? "B" : "C");
-      r.proposedDaysClie = partToDays[r.partClie];
-      r.proposedLettersClie = partToFreqLetters[r.partClie];
-    }
-
-    const byFeat = new Map();
-    for (const r of records){
-      const k = r.featIdx;
-      if (k == null) continue;
-      if (!byFeat.has(k)) byFeat.set(k, {A:0,B:0,C:0});
-      byFeat.get(k)[r.partClie] = (byFeat.get(k)[r.partClie] || 0) + 1;
-    }
-
-    featurePartByIdxClie = new Map();
-    for (const [idx, counts] of byFeat){
-      let maj="A", max=-1;
-      for (const p of ["A","B","C"]) {
-        if ((counts[p] || 0) > max){ max=(counts[p] || 0); maj=p; }
-      }
-      featurePartByIdxClie.set(idx, maj);
-    }
-
-    for (const r of records){
-      const mj = featurePartByIdxClie.get(r.featIdx);
-      if (mj){
-        r.partClie = mj;
-        r.proposedDaysClie = partToDays[mj];
-        r.proposedLettersClie = partToFreqLetters[mj];
-      }
-    }
-  }
-
   function buildAdjacency(){
     adjacency = new Map();
     audit.adjacencyCount = [];
@@ -602,15 +672,11 @@ function normalize(s){
       for (let j=i+1; j<feats.length; j++){
         const fj = feats[j];
         const bj = turf.bbox(fj);
-
         const bboxOverlap = !(bi[2] < bj[0] || bj[2] < bi[0] || bi[3] < bj[1] || bj[3] < bi[1]);
         if (!bboxOverlap) continue;
 
         let isAdj = false;
-        try {
-          isAdj = turf.booleanTouches(fi, fj);
-        } catch(e){}
-
+        try { isAdj = turf.booleanTouches(fi, fj); } catch(e){}
         if (isAdj){
           adjacency.get(i).add(j);
           adjacency.get(j).add(i);
@@ -687,6 +753,7 @@ function normalize(s){
     neigh.forEach(n => {
       if (partMap.get(n) === toPart) touchesTo = true;
     });
+
     if (!touchesTo){
       audit.rejectedNoAdj.push({ featIdx, distrito: districtStats.get(featIdx)?.label || featIdx, fromPart, toPart });
       return false;
@@ -741,13 +808,107 @@ function normalize(s){
     return partMap;
   }
 
+  function assignBalancedSubpartsForMap(partMap){
+    const result = new Map();
+
+    ["A","B","C"].forEach(mainPart => {
+      const items = [];
+      districtStats.forEach((d, idx) => {
+        if (partMap.get(idx) === mainPart){
+          items.push({
+            featIdx: idx,
+            kg: d.kg,
+            count: d.count
+          });
+        }
+      });
+
+      items.sort((a,b) => (b.kg - a.kg) || (b.count - a.count));
+
+      let g1Kg = 0, g2Kg = 0, g1Ct = 0, g2Ct = 0;
+      for (const item of items){
+        const score1 = Math.abs((g1Kg + item.kg) - g2Kg) + Math.abs((g1Ct + item.count) - g2Ct) * 8;
+        const score2 = Math.abs(g1Kg - (g2Kg + item.kg)) + Math.abs(g1Ct - (g2Ct + item.count)) * 8;
+
+        if (score1 <= score2){
+          result.set(item.featIdx, `${mainPart}1`);
+          g1Kg += item.kg;
+          g1Ct += item.count;
+        } else {
+          result.set(item.featIdx, `${mainPart}2`);
+          g2Kg += item.kg;
+          g2Ct += item.count;
+        }
+      }
+    });
+
+    return result;
+  }
+
+  function assignPartsClie(){
+    const sorted = [...records].sort((a,b)=>a.lon - b.lon);
+    const n = sorted.length;
+    if (n === 0) return;
+
+    const size = Math.ceil(n / 3), cut1 = size, cut2 = size * 2;
+
+    for (let i=0; i<n; i++){
+      const r = sorted[i];
+      r.partClie = (i < cut1) ? "A" : (i < cut2 ? "B" : "C");
+      r.proposedDaysClie = partToDays[r.partClie];
+      r.proposedLettersClie = partToFreqLetters[r.partClie];
+    }
+
+    const byFeat = new Map();
+    for (const r of records){
+      const k = r.featIdx;
+      if (k == null) continue;
+      if (!byFeat.has(k)) byFeat.set(k, {A:0,B:0,C:0});
+      byFeat.get(k)[r.partClie] = (byFeat.get(k)[r.partClie] || 0) + 1;
+    }
+
+    featurePartByIdxClie = new Map();
+    for (const [idx, counts] of byFeat){
+      let maj="A", max=-1;
+      for (const p of ["A","B","C"]) {
+        if ((counts[p] || 0) > max){
+          max=(counts[p] || 0);
+          maj=p;
+        }
+      }
+      featurePartByIdxClie.set(idx, maj);
+    }
+
+    const swapped = new Map();
+    featurePartByIdxClie.forEach((part, idx) => {
+      swapped.set(idx, swapMainPart(part));
+    });
+    featurePartByIdxClie = swapped;
+
+    featureSubpartByIdxClie = assignBalancedSubpartsForMap(featurePartByIdxClie);
+
+    for (const r of records){
+      const p = featurePartByIdxClie.get(r.featIdx) || "A";
+      const sp = featureSubpartByIdxClie.get(r.featIdx) || `${p}1`;
+      r.partClie = p;
+      r.subpartClie = sp;
+      r.proposedDaysClie = partToDays[p];
+      r.proposedLettersClie = partToFreqLetters[p];
+    }
+  }
+
   function optimizeKgFromClie(){
     audit.moved = [];
     audit.rejectedNoAdj = [];
     audit.rejectedConnectivity = [];
     audit.rejectedNoImprove = [];
 
-    featurePartByIdxKg = new Map(featurePartByIdxClie);
+    const baseClieNoSwap = new Map();
+    featurePartByIdxClie.forEach((part, idx) => {
+      baseClieNoSwap.set(idx, swapMainPart(part));
+    });
+
+    featurePartByIdxKg = new Map(baseClieNoSwap);
     audit.initialTotals = getPartTotals(featurePartByIdxKg);
 
     featurePartByIdxKg = trySplitMirafloresSanIsidro(featurePartByIdxKg);
@@ -840,9 +1001,19 @@ function normalize(s){
 
     audit.finalTotals = getPartTotals(featurePartByIdxKg);
 
+    const swappedKg = new Map();
+    featurePartByIdxKg.forEach((part, idx) => {
+      swappedKg.set(idx, swapMainPart(part));
+    });
+    featurePartByIdxKg = swappedKg;
+
+    featureSubpartByIdxKg = assignBalancedSubpartsForMap(featurePartByIdxKg);
+
     for (const r of records){
-      const p = featurePartByIdxKg.get(r.featIdx) || r.partClie || "A";
+      const p = featurePartByIdxKg.get(r.featIdx) || "A";
+      const sp = featureSubpartByIdxKg.get(r.featIdx) || `${p}1`;
       r.partKg = p;
+      r.subpartKg = sp;
       r.proposedDaysKg = partToDays[p];
       r.proposedLettersKg = partToFreqLetters[p];
     }
@@ -864,8 +1035,11 @@ function normalize(s){
   function ingestRows(rows){
     const startIdx = hasHeader(rows[0]) ? 1 : 0;
     const prelim = [];
+
     for (let i=startIdx; i<rows.length; i++){
-      const row = rows[i]; if (!row) continue;
+      const row = rows[i];
+      if (!row) continue;
+
       const code = (row[0] ?? "").toString().trim();
       if (!code || EXCLUDE_CODES.has(code)) continue;
 
@@ -910,12 +1084,13 @@ function normalize(s){
         featIdx: container.idx, geoDistName,
         hadZ3: days.length > 2,
         kg,
-        partClie:null, proposedDaysClie:[], proposedLettersClie:"",
-        partKg:null, proposedDaysKg:[], proposedLettersKg:""
+        partClie:null, subpartClie:null, proposedDaysClie:[], proposedLettersClie:"",
+        partKg:null, subpartKg:null, proposedDaysKg:[], proposedLettersKg:""
       });
     }
 
-    const seen = new Set(); const deduped = [];
+    const seen = new Set();
+    const deduped = [];
     for (const r of prelim){
       const key = `${normalizeName(r.name||"")}${r.lat.toFixed(6)}${r.lon.toFixed(6)}`;
       if (seen.has(key)) continue;
@@ -937,33 +1112,40 @@ function normalize(s){
       "Codigo Cliente","Nombre Cliente","Distrito Catalogo","Distrito GeoJson",
       "Frecuencia Actual","Frecuencia Prop Clie","Frecuencia Prop Kg",
       "Canal","Ruta","Latitud","Longitud","Oficina","Kg_Prom",
-      "Parte_Clie","Parte_Kg"
+      "Parte_Clie","Subparte_Clie","Parte_Kg","Subparte_Kg"
     ];
-const csv = [
-  headers.join(",")
-].concat(
-  rows.map(r => [
-    r.code,
-    r.name,
-    r.distrito,
-    r.geoDistName,
-    r.freqLetters ?? "",
-    r.proposedClieLetters ?? "",
-    r.proposedKgLetters ?? "",
-    r.canal ?? "",
-    r.route ?? "",
-    r.lat,
-    r.lon,
-    r.office ?? "",
-    r.volume ?? 0,      // antes estaba r.kg
-    r.partClie ?? "",
-    r.partKg ?? ""
-  ].map(csvEscape).join(","))
-).join("\r\n");
+
+    const csv = [
+      headers.join(",")
+    ].concat(
+      rows.map(r => [
+        r.code,
+        r.name,
+        r.distrito,
+        r.geoDistName,
+        r.freqLetters ?? "",
+        r.proposedLettersClie ?? "",
+        r.proposedLettersKg ?? "",
+        r.canal ?? "",
+        r.route ?? "",
+        r.lat,
+        r.lon,
+        r.office ?? "",
+        r.kg ?? 0,
+        r.partClie ?? "",
+        r.subpartClie ?? "",
+        r.partKg ?? "",
+        r.subpartKg ?? ""
+      ].map(csvEscape).join(","))
+    ).join("
+");
+
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "ATEII_export.csv"; a.click();
+    a.href = url;
+    a.download = "ATEII_export.csv";
+    a.click();
     URL.revokeObjectURL(url);
   });
 
@@ -973,20 +1155,23 @@ const csv = [
       if (!isValidOffice(r.office)) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (filterZ3 && !r.hadZ3) continue;
+
       const pass = (selectedDay === "Todos") ? true :
         (viewMode === "Actual" ? r.days.includes(selectedDay) : (getProposalFields(r).proposedDays || []).includes(selectedDay));
       if (!pass) continue;
+
       out.push(r);
     }
     return out;
   }
 
-function csvEscape(v){
-  const s = (v ?? "").toString();
-  return /[",\r\n]/.test(s)
-    ? `"${s.replace(/"/g,'""')}"`
-    : s;
-}
+  function csvEscape(v){
+    const s = (v ?? "").toString();
+    return /[",
+]/.test(s)
+      ? `"${s.replace(/"/g,'""')}"`
+      : s;
+  }
 
   document.getElementById('viewTabs').addEventListener('click', (e)=>{
     if (e.target.tagName === "BUTTON"){
@@ -1006,28 +1191,64 @@ function csvEscape(v){
     }
   });
 
-  document.getElementById('canalFilter').addEventListener('change', (e)=>{ selectedCanal = e.target.value || "Todos"; refreshLayers(); });
-  document.getElementById('oficAte').addEventListener('change', (e)=>{ if (e.target.checked) filterOffices.add("OFIC ATE"); else filterOffices.delete("OFIC ATE"); refreshLayers(); });
-  document.getElementById('oficChorri').addEventListener('change', (e)=>{ if (e.target.checked) filterOffices.add("OFIC CHORRILLOS"); else filterOffices.delete("OFIC CHORRILLOS"); refreshLayers(); });
-  document.getElementById('markersToggle').addEventListener('change', (e)=>{ showMarkers = e.target.checked; refreshLayers(); });
-  document.getElementById('z3Toggle').addEventListener('change', (e)=>{ filterZ3 = e.target.checked; refreshLayers(); });
+  document.getElementById('canalFilter').addEventListener('change', (e)=>{
+    selectedCanal = e.target.value || "Todos";
+    refreshLayers();
+  });
+
+  document.getElementById('oficAte').addEventListener('change', (e)=>{
+    if (e.target.checked) filterOffices.add("OFIC ATE");
+    else filterOffices.delete("OFIC ATE");
+    refreshLayers();
+  });
+
+  document.getElementById('oficChorri').addEventListener('change', (e)=>{
+    if (e.target.checked) filterOffices.add("OFIC CHORRILLOS");
+    else filterOffices.delete("OFIC CHORRILLOS");
+    refreshLayers();
+  });
+
+  document.getElementById('markersToggle').addEventListener('change', (e)=>{
+    showMarkers = e.target.checked;
+    refreshLayers();
+  });
+
+  document.getElementById('z3Toggle').addEventListener('change', (e)=>{
+    filterZ3 = e.target.checked;
+    refreshLayers();
+  });
 
   fetch(GEOJSON_URL)
     .then(r => r.json())
     .then(geo => {
-      areaFeatures = (geo && geo.type === "FeatureCollection") ? geo : { type:"FeatureCollection", features: [geo] };
-      areaFeatures.features.forEach((f,i)=>{ if(!f.properties) f.properties={}; f.properties.__idx=i; });
+      areaFeatures = (geo && geo.type === "FeatureCollection")
+        ? geo
+        : { type:"FeatureCollection", features: [geo] };
+
+      areaFeatures.features.forEach((f,i)=>{
+        if(!f.properties) f.properties={};
+        f.properties.__idx=i;
+      });
+
       boundaryLayer.addData(areaFeatures);
       buildAdjacency();
-      try { const b=boundaryLayer.getBounds(); if (b && b.isValid()) map.fitBounds(b.pad(0.05)); } catch(e){}
+
+      try {
+        const b=boundaryLayer.getBounds();
+        if (b && b.isValid()) map.fitBounds(b.pad(0.05));
+      } catch(e){}
 
       Papa.parse(VOL_URL, {
-        download:true, dynamicTyping:false, skipEmptyLines:true,
+        download:true,
+        dynamicTyping:false,
+        skipEmptyLines:true,
         complete: (vRes) => {
           const vRows = vRes.data || [];
           const vStart = (vRows[0] && isNaN(num(vRows[0][1]))) ? 1 : 0;
+
           for (let i=vStart; i<vRows.length; i++){
-            const row = vRows[i]; if (!row) continue;
+            const row = vRows[i];
+            if (!row) continue;
             const code = (row[0] ?? "").toString().trim();
             if (!code) continue;
             const kgVal = num(row[1]);
@@ -1035,24 +1256,42 @@ function csvEscape(v){
           }
 
           Papa.parse(CSV_URL, {
-            download:true, dynamicTyping:false, skipEmptyLines:true,
+            download:true,
+            dynamicTyping:false,
+            skipEmptyLines:true,
             complete: (results) => {
-              const rows=results.data;
-              if (!rows || !rows.length){ alert("No se pudo leer el CSV o está vacío."); return; }
+              const rows = results.data;
+              if (!rows || !rows.length){
+                alert("No se pudo leer el CSV o está vacío.");
+                return;
+              }
               ingestRows(rows);
             },
-            error: (err) => { console.error(err); alert("Error al descargar o parsear el CSV de catálogo."); }
+            error: (err) => {
+              console.error(err);
+              alert("Error al descargar o parsear el CSV de catálogo.");
+            }
           });
         },
         error: (err) => {
           console.error(err);
           alert("Error al descargar Vol_Prom.csv. Se asignarán kg = 0.");
+
           Papa.parse(CSV_URL, {
-            download:true, dynamicTyping:false, skipEmptyLines:true,
+            download:true,
+            dynamicTyping:false,
+            skipEmptyLines:true,
             complete: (results) => {
-              const rows=results.data;
-              if (!rows || !rows.length){ alert("No se pudo leer el CSV o está vacío."); return; }
+              const rows = results.data;
+              if (!rows || !rows.length){
+                alert("No se pudo leer el CSV o está vacío.");
+                return;
+              }
               ingestRows(rows);
+            },
+            error: (err2) => {
+              console.error(err2);
+              alert("Error al descargar o parsear el CSV de catálogo.");
             }
           });
         }
@@ -1062,6 +1301,7 @@ function csvEscape(v){
       console.error("No se pudo cargar el GeoJSON:", err);
       alert("No se pudo cargar el GeoJSON de límites.");
     });
+
 })();
 </script>
 </body>
