@@ -1164,12 +1164,13 @@
     return out;
   }
 
-  function csvEscape(v){
-    const s = (v ?? "").toString();
-    return /[",
-]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
-  }
+function csvEscape(v) {
+  const s = (v ?? "").toString();
 
+  return /[",\n]/.test(s)
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
+}
   document.getElementById('exportBtn').addEventListener('click', ()=>{
     const rows = getFilteredRowsForExport();
     const headers = [
