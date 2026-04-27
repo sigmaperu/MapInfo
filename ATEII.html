@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ATEII – Atención actual vs propuestas</title>
+<title>ATEII – Atención actual vs propuesta</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -23,69 +23,200 @@
   --chip-bg:#0d1522;
   --elev: 0 2px 10px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
  }
- *{ box-sizing:border-box }
+ *{ box-sizing:border-box; }
  body{
-  margin:0; font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  background:var(--md-bg); color:var(--md-text);
+  margin:0;
+  font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background:var(--md-bg);
+  color:var(--md-text);
  }
  header{
-  position:sticky; top:0; z-index:1000;
-  padding:8px 10px; border-bottom:1px solid var(--md-outline);
-  display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-  background:linear-gradient(180deg, #0b0f14 0%, #0f1520 100%); box-shadow:var(--elev);
+  position:sticky;
+  top:0;
+  z-index:1000;
+  padding:8px 10px;
+  border-bottom:1px solid var(--md-outline);
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  background:linear-gradient(180deg, #0b0f14 0%, #0f1520 100%);
+  box-shadow:var(--elev);
  }
- h1{ font-size:15px; margin:0; letter-spacing:.2px; font-weight:700; }
- .muted{ color:var(--md-muted); font-size:11px; }
- .controls{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+ h1{
+  font-size:15px;
+  margin:0;
+  letter-spacing:.2px;
+  font-weight:700;
+ }
+ .muted{
+  color:var(--md-muted);
+  font-size:11px;
+ }
+ .controls{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+ }
  .group{
-  display:flex; gap:6px; align-items:center; padding:6px 8px;
-  background:var(--md-surface-2); border:1px solid var(--md-outline); border-radius:10px;
+  display:flex;
+  gap:6px;
+  align-items:center;
+  padding:6px 8px;
+  background:var(--md-surface-2);
+  border:1px solid var(--md-outline);
+  border-radius:10px;
  }
  .segmented{
-  display:flex; overflow:hidden; border-radius:9px; border:1px solid var(--md-outline); background:var(--chip-bg);
+  display:flex;
+  overflow:hidden;
+  border-radius:9px;
+  border:1px solid var(--md-outline);
+  background:var(--chip-bg);
  }
  .segmented button{
-  background:transparent; color:var(--md-text); border:0; padding:5px 8px; cursor:pointer; font-weight:700; font-size:12px;
+  background:transparent;
+  color:var(--md-text);
+  border:0;
+  padding:5px 8px;
+  cursor:pointer;
+  font-weight:700;
+  font-size:12px;
  }
- .segmented button.active{ background:var(--md-primary); color:#0a0716; }
- .segmented button + button{ border-left:1px solid var(--md-outline); }
- label.switch{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none; font-weight:600; font-size:12px;}
+ .segmented button.active{
+  background:var(--md-primary);
+  color:#0a0716;
+ }
+ .segmented button + button{
+  border-left:1px solid var(--md-outline);
+ }
+ label.switch{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+  user-select:none;
+  font-weight:600;
+  font-size:12px;
+ }
  .toggle{
-  width:44px; height:24px; background:#0b1320; border:1px solid var(--md-outline); border-radius:999px; position:relative; transition:.2s;
+  width:44px;
+  height:24px;
+  background:#0b1320;
+  border:1px solid var(--md-outline);
+  border-radius:999px;
+  position:relative;
+  transition:.2s;
  }
- .knob{ width:20px; height:20px; background:#fff; border-radius:50%; position:absolute; top:1.5px; left:1.5px; transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,.5);} 
+ .knob{
+  width:20px;
+  height:20px;
+  background:#fff;
+  border-radius:50%;
+  position:absolute;
+  top:1.5px;
+  left:1.5px;
+  transition:.2s;
+  box-shadow:0 1px 2px rgba(0,0,0,.5);
+ }
  input[type="checkbox"].toggle-input{ display:none; }
  input[type="checkbox"].toggle-input:checked + .toggle{ background:var(--md-secondary); }
  input[type="checkbox"].toggle-input:checked + .toggle .knob{ left:22px; }
+
  .select{
-  appearance:none; background:#0b1320; border:1px solid var(--md-outline); color:var(--md-text); padding:6px 8px; border-radius:9px;
-  font-weight:600; font-size:12px;
+  appearance:none;
+  background:#0b1320;
+  border:1px solid var(--md-outline);
+  color:var(--md-text);
+  padding:6px 8px;
+  border-radius:9px;
+  font-weight:600;
+  font-size:12px;
  }
  .btn{
-  padding:6px 10px; border:1px solid var(--md-outline); background:#1a2030;
-  color:#dcd3ff; border-radius:9px; cursor:pointer; font-weight:700; letter-spacing:.3px; font-size:12px;
+  padding:6px 10px;
+  border:1px solid var(--md-outline);
+  background:#1a2030;
+  color:#dcd3ff;
+  border-radius:9px;
+  cursor:pointer;
+  font-weight:700;
+  letter-spacing:.3px;
+  font-size:12px;
  }
  .btn:hover{ filter:brightness(1.12); }
+
  #map{ height: calc(100vh - 86px); }
+
  .legend{
-  position:absolute; bottom:12px; left:12px; z-index:600; background:rgba(15,21,32,.94);
-  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width:560px; box-shadow:var(--elev);
+  position:absolute;
+  bottom:12px;
+  left:12px;
+  z-index:600;
+  background:rgba(15,21,32,.94);
+  border:1px solid var(--md-outline);
+  border-radius:12px;
+  padding:10px;
+  font-size:12px;
+  max-width:560px;
+  box-shadow:var(--elev);
   backdrop-filter: blur(8px);
  }
- .legend h4{ margin:0 0 4px 0; font-size:12px; }
- .legend .row{ display:flex; align-items:center; gap:6px; margin:4px 0; flex-wrap:wrap;}
- .swatch{ width:12px; height:12px; border-radius:2px; border:1px solid #0003; }
- .pill{ font-size:10px; padding:2px 6px; border:1px solid var(--md-outline); border-radius:999px; color:var(--md-muted); background:var(--chip-bg);} 
- a, a:visited{ color:#93c5fd; text-decoration:none; }
+ .legend h4{
+  margin:0 0 4px 0;
+  font-size:12px;
+ }
+ .legend .row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin:4px 0;
+  flex-wrap:wrap;
+ }
+ .swatch{
+  width:12px;
+  height:12px;
+  border-radius:2px;
+  border:1px solid #0003;
+ }
+ .pill{
+  font-size:10px;
+  padding:2px 6px;
+  border:1px solid var(--md-outline);
+  border-radius:999px;
+  color:var(--md-muted);
+  background:var(--chip-bg);
+ }
+ a, a:visited{
+  color:#93c5fd;
+  text-decoration:none;
+ }
  a:hover{ text-decoration:underline; }
  .freq{
-  display:inline-block; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-weight:800; font-size:12px; background:#0b1221; color:#c7d2fe; padding:2px 6px; border-radius:6px; border:1px solid #111827; 
+  display:inline-block;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-weight:800;
+  font-size:12px;
+  background:#0b1221;
+  color:#c7d2fe;
+  padding:2px 6px;
+  border-radius:6px;
+  border:1px solid #111827;
  }
  .popup-line{ margin:3px 0; }
  .popup-muted{ color:#9CA3AF; }
- .leaflet-tooltip { background:#101826; color:#dbe7f3; border:1px solid #223144; border-radius:10px; box-shadow:var(--elev); }
- .leaflet-control-container .leaflet-bottom.leaflet-right { right: 16px; bottom: 16px; }
+ .leaflet-tooltip{
+  background:#101826;
+  color:#dbe7f3;
+  border:1px solid #223144;
+  border-radius:10px;
+  box-shadow:var(--elev);
+ }
+ .leaflet-control-container .leaflet-bottom.leaflet-right{
+  right:16px;
+  bottom:16px;
+ }
 </style>
 </head>
 <body>
@@ -94,15 +225,16 @@
     <h1>ATEII · Mapa de atención</h1>
     <div class="muted">CSV: Catálogo Sigma + Volumen · GeoJSON distritos</div>
   </div>
+
   <div class="controls">
     <div class="group">
       <strong style="font-size:11px;">Vista:</strong>
       <div id="viewTabs" class="segmented" role="tablist" aria-label="Vista">
         <button data-view="Actual" class="active">Actual</button>
         <button data-view="PropClie">Prop. Clie</button>
-        <button data-view="PropKg">Prop. Kg</button>
       </div>
     </div>
+
     <div class="group">
       <strong style="font-size:11px;">Día:</strong>
       <div id="dayFilter" class="segmented" role="tablist" aria-label="Filtro de día">
@@ -115,17 +247,20 @@
         <button data-day="Sábado">S</button>
       </div>
     </div>
+
     <div class="group">
       <strong style="font-size:11px;">Canal:</strong>
       <select id="canalFilter" class="select" title="Filtrar por canal">
         <option value="Todos">Todos</option>
       </select>
     </div>
+
     <div class="group">
       <strong style="font-size:11px;">Oficina:</strong>
       <label><input type="checkbox" id="oficAte" checked> <span class="pill">Ofic Ate</span></label>
       <label><input type="checkbox" id="oficChorri" checked> <span class="pill">Ofic Chorrillos</span></label>
     </div>
+
     <div class="group">
       <label class="switch" title="Mostrar/Ocultar marcadores">
         <span>Marcadores</span>
@@ -133,6 +268,7 @@
         <span class="toggle"><span class="knob"></span></span>
       </label>
     </div>
+
     <div class="group" title="Mostrar solo clientes con más de 2 días actuales">
       <label class="switch">
         <span>+Z3</span>
@@ -140,6 +276,7 @@
         <span class="toggle"><span class="knob"></span></span>
       </label>
     </div>
+
     <div class="group">
       <button id="exportBtn" class="btn" title="Exportar CSV (respeta filtros activos)">Exportar CSV</button>
     </div>
@@ -182,12 +319,6 @@
     C2: { color:"#0f172a", fillColor:"#14b8a6", fillOpacity:0.38 }
   };
 
-  const KG_WEIGHT = 1.0;
-  const CLIENT_WEIGHT = 8.0;
-  const KG_PRIORITY_FACTOR = 1.15;
-  const MAX_ITERS = 40;
-  const ENABLE_AUDIT = true;
-
   let viewMode = "Actual";
   let selectedDay = "Todos";
   let selectedCanal = "Todos";
@@ -197,33 +328,34 @@
 
   const map = L.map('map', { preferCanvas:true, zoomControl:false });
   L.control.zoom({ position: 'bottomright' }).addTo(map);
-  map.createPane('zonesPane'); map.getPane('zonesPane').style.zIndex = 300;
-  map.createPane('markersPane'); map.getPane('markersPane').style.zIndex = 600;
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
+
+  map.createPane('zonesPane');
+  map.getPane('zonesPane').style.zIndex = 300;
+
+  map.createPane('markersPane');
+  map.getPane('markersPane').style.zIndex = 600;
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'© OpenStreetMap'
+  }).addTo(map);
+
   const currentLayer = L.layerGroup().addTo(map);
   const proposedLayer = L.layerGroup();
-  const boundaryLayer = L.geoJSON(null, { pane:'zonesPane', style: { color:'#ef4444', weight:1, fill:false } }).addTo(map);
+  const boundaryLayer = L.geoJSON(null, {
+    pane:'zonesPane',
+    style: { color:'#ef4444', weight:1, fill:false }
+  }).addTo(map);
+
   const districtsLayerHolder = L.layerGroup().addTo(map);
 
   let areaFeatures = null;
   let records = [];
   let featurePartByIdxClie = new Map();
-  let featurePartByIdxKg = new Map();
   let featureSubpartByIdxClie = new Map();
-  let featureSubpartByIdxKg = new Map();
   let kgByCode = new Map();
   let adjacency = new Map();
   let districtStats = new Map();
-
-  const audit = {
-    adjacencyCount: [],
-    moved: [],
-    rejectedNoAdj: [],
-    rejectedConnectivity: [],
-    rejectedNoImprove: [],
-    initialTotals: null,
-    finalTotals: null
-  };
+  let channelPalette = {};
 
   function normalize(s){
     return (s ?? "")
@@ -257,13 +389,16 @@
   function parseDays(raw){
     const s = (raw ?? "").toString().toUpperCase().replace(/[^LMXJVS]/g,"");
     const set = new Set();
-    for (const ch of s) if (dayLetterToName[ch]) set.add(dayLetterToName[ch]);
+    for (const ch of s){
+      if (dayLetterToName[ch]) set.add(dayLetterToName[ch]);
+    }
     return orderDays.filter(d => set.has(d));
   }
 
   function toFreqLetters(dayArr){
     return ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"]
-      .map(n => dayArr.includes(n) ? dayNameToLetter[n] : "").join("");
+      .map(n => dayArr.includes(n) ? dayNameToLetter[n] : "")
+      .join("");
   }
 
   function swapMainPart(part){
@@ -280,7 +415,12 @@
     };
   }
 
-  const DIST_KEYS = ["NOMBDIST","DISTRITO","DIST","NOMBRE","NAME","nom_dist","nomdistr","distrito","Distrito","NOMDIST","NOMBREDIST","NOMB_DIST"];
+  const DIST_KEYS = [
+    "NOMBDIST","DISTRITO","DIST","NOMBRE","NAME",
+    "nom_dist","nomdistr","distrito","Distrito",
+    "NOMDIST","NOMBREDIST","NOMB_DIST"
+  ];
+
   function getFeatureDistName(f){
     const p = f?.properties || {};
     for (const k of DIST_KEYS){
@@ -297,31 +437,31 @@
     const pt = turf.point([lon, lat]);
     const feats = areaFeatures.features || [];
     for (let i=0; i<feats.length; i++){
-      const f=feats[i];
+      const f = feats[i];
       if (turf.booleanPointInPolygon(pt, f)) return { idx:i, name:getFeatureDistName(f) };
     }
     return null;
   }
 
   const baseColors = ["#22c55e","#eab308","#06b6d4","#f97316","#a855f7","#ef4444","#14b8a6","#f43f5e","#84cc16","#e879f9","#60a5fa","#f59e0b","#10b981","#8b5cf6"];
-  const channelPalette = {};
+
   function colorForChannel(canal){
     if (!canal) return "#6b7280";
     if (channelPalette[canal]) return channelPalette[canal];
-    let h=0;
-    for(let i=0;i<canal.length;i++) h=(h*31 + canal.charCodeAt(i))>>>0;
+    let h = 0;
+    for (let i=0; i<canal.length; i++) h = (h*31 + canal.charCodeAt(i)) >>> 0;
     const color = baseColors[h % baseColors.length];
     channelPalette[canal] = color;
     return color;
   }
 
-  function escapeHtml(str) {
+  function escapeHtml(str){
     return (str ?? "").toString()
       .replace(/&/g, "&amp;")
-      .replace(/</g,  "&lt;")
-      .replace(/>/g,  "&gt;")
-      .replace(/"/g,  "&quot;")
-      .replace(/'/g,  "&#39;");
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   function isValidOffice(office){
@@ -345,14 +485,6 @@
         proposedLetters: r.proposedLettersClie
       };
     }
-    if (viewMode === "PropKg"){
-      return {
-        part: r.partKg,
-        subpart: r.subpartKg,
-        proposedDays: r.proposedDaysKg,
-        proposedLetters: r.proposedLettersKg
-      };
-    }
     return { part:null, subpart:null, proposedDays:[], proposedLetters:"" };
   }
 
@@ -365,9 +497,8 @@
     const freqNow = r.freqLetters || "—";
     const freqProp = prop.proposedLetters || "—";
     const kgStr = (r.kg && r.kg > 0) ? `${r.kg.toFixed(1)} kg prom.` : "Sin dato";
-    let lblProp = "Propuesta";
-    if (viewMode === "PropClie") lblProp = "Prop. Clie";
-    if (viewMode === "PropKg") lblProp = "Prop. Kg";
+    const lblProp = "Prop. Clie";
+
     return `
       <div style="min-width:285px; line-height:1.3;">
         <div class="popup-line" style="font-weight:800; font-size:14px;">Cliente: ${escapeHtml(r.code)}</div>
@@ -396,8 +527,10 @@
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (!passesZ3(r)) continue;
 
-      const pass = (selectedDay === "Todos") ? true :
-        (viewMode === "Actual" ? r.days.includes(selectedDay) : (getProposalFields(r).proposedDays || []).includes(selectedDay));
+      const pass = (selectedDay === "Todos")
+        ? true
+        : (viewMode === "Actual" ? r.days.includes(selectedDay) : (getProposalFields(r).proposedDays || []).includes(selectedDay));
+
       if (!pass) continue;
 
       const key = r.canal || "Sin canal";
@@ -414,12 +547,14 @@
       B1:{count:0,kg:0}, B2:{count:0,kg:0},
       C1:{count:0,kg:0}, C2:{count:0,kg:0}
     };
+
     if (viewMode === "Actual") return res;
 
     for (const r of records){
       if (!isValidOffice(r.office)) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
       if (!passesZ3(r)) continue;
+
       const prop = getProposalFields(r);
       if (prop.subpart && res[prop.subpart]){
         res[prop.subpart].count++;
@@ -430,7 +565,11 @@
   }
 
   function daySummaryWithFilters(){
-    const res = { L:{count:0,kg:0}, M:{count:0,kg:0}, X:{count:0,kg:0}, J:{count:0,kg:0}, V:{count:0,kg:0}, S:{count:0,kg:0} };
+    const res = {
+      L:{count:0,kg:0}, M:{count:0,kg:0}, X:{count:0,kg:0},
+      J:{count:0,kg:0}, V:{count:0,kg:0}, S:{count:0,kg:0}
+    };
+
     for (const r of records){
       if (!isValidOffice(r.office)) continue;
       if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
@@ -449,6 +588,7 @@
   }
 
   const legendEl = document.getElementById('legend');
+
   function renderLegend(){
     const channelSummary = channelSummaryWithFilters();
     const channelItems = Object.keys(channelSummary).sort().map(canal => {
@@ -467,7 +607,7 @@
 
     let header = "🎯 Atención actual";
     if (viewMode === "PropClie") header = "🧭 Propuesta clientes";
-    if (viewMode === "PropKg") header = "⚖️ Propuesta Kg auditada";
+
     const z3 = filterZ3 ? `<span class="pill">+Z3</span>` : "";
 
     const subpartRows = ["A1","A2","B1","B2","C1","C2"].map(sp => {
@@ -509,10 +649,12 @@
     if (map.hasLayer(proposedLayer)) layers.push(proposedLayer);
     if (map.hasLayer(boundaryLayer)) layers.push(boundaryLayer);
     if (map.hasLayer(districtsLayerHolder)) layers.push(districtsLayerHolder);
+
     for (const l of layers){
       const b = l.getBounds?.();
       if (b && b.isValid()) bounds = bounds ? bounds.extend(b) : b;
     }
+
     if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.08));
     else map.setView([-12.0464, -77.0428], 10);
   }
@@ -520,7 +662,11 @@
   function renderDistrictsColoredByPart(){
     districtsLayerHolder.clearLayers();
     if (!areaFeatures) return;
-    areaFeatures.features.forEach((f, i) => { if (!f.properties) f.properties = {}; f.properties.__idx = i; });
+
+    areaFeatures.features.forEach((f, i) => {
+      if (!f.properties) f.properties = {};
+      f.properties.__idx = i;
+    });
 
     const layer = L.geoJSON(areaFeatures, {
       pane:'zonesPane',
@@ -528,7 +674,6 @@
         const idx = feature.properties.__idx;
         let subpart = null;
         if (viewMode === "PropClie") subpart = featureSubpartByIdxClie.get(idx);
-        else if (viewMode === "PropKg") subpart = featureSubpartByIdxKg.get(idx);
 
         if (subpart){
           const st = getSubpartStyle(subpart);
@@ -544,9 +689,16 @@
       },
       onEachFeature: (feature, polygonLayer) => {
         const name = getFeatureDistName(feature);
-        polygonLayer.bindTooltip(name, {direction:'auto', opacity:0.95, sticky:true, className:'district-tip', permanent:false});
+        polygonLayer.bindTooltip(name, {
+          direction:'auto',
+          opacity:0.95,
+          sticky:true,
+          className:'district-tip',
+          permanent:false
+        });
       }
     });
+
     layer.addTo(districtsLayerHolder);
   }
 
@@ -599,11 +751,12 @@
   function populateCanalFilter(canalList){
     const sel = document.getElementById('canalFilter');
     const uniq = Array.from(new Set(canalList));
-    sel.innerHTML = `<option value="Todos">Todos</option>` + uniq.sort().map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+    sel.innerHTML = `<option value="Todos">Todos</option>` + uniq.sort().map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
   }
 
   function buildDistrictStats(){
     districtStats = new Map();
+
     for (const r of records){
       if (r.featIdx == null) continue;
       if (!districtStats.has(r.featIdx)){
@@ -623,8 +776,6 @@
 
   function buildAdjacency(){
     adjacency = new Map();
-    audit.adjacencyCount = [];
-
     if (!areaFeatures?.features?.length) return;
 
     const feats = areaFeatures.features;
@@ -637,177 +788,232 @@
       for (let j=i+1; j<feats.length; j++){
         const fj = feats[j];
         const bj = turf.bbox(fj);
+
         const bboxOverlap = !(bi[2] < bj[0] || bj[2] < bi[0] || bi[3] < bj[1] || bj[3] < bi[1]);
         if (!bboxOverlap) continue;
 
         let isAdj = false;
         try { isAdj = turf.booleanTouches(fi, fj); } catch(e){}
+
         if (isAdj){
           adjacency.get(i).add(j);
           adjacency.get(j).add(i);
         }
       }
     }
-
-    if (ENABLE_AUDIT){
-      adjacency.forEach((set, idx) => {
-        audit.adjacencyCount.push({
-          idx,
-          distrito: getFeatureDistName(areaFeatures.features[idx]),
-          vecinos: set.size
-        });
-      });
-    }
   }
 
-  function getPartTotals(partMap){
-    const totals = {
-      A:{kg:0,count:0},
-      B:{kg:0,count:0},
-      C:{kg:0,count:0}
-    };
-    districtStats.forEach((d, idx) => {
-      const p = partMap.get(idx);
-      if (!p || !totals[p]) return;
-      totals[p].kg += d.kg;
-      totals[p].count += d.count;
-    });
-    return totals;
-  }
-
-  function scoreBreakdown(totals){
-    const kgVals = [totals.A.kg, totals.B.kg, totals.C.kg];
-    const ctVals = [totals.A.count, totals.B.count, totals.C.count];
-    const kgSpread = Math.max(...kgVals) - Math.min(...kgVals);
-    const ctSpread = Math.max(...ctVals) - Math.min(...ctVals);
-    const score = (kgSpread * KG_WEIGHT * KG_PRIORITY_FACTOR) + (ctSpread * CLIENT_WEIGHT);
-    return { kgSpread, ctSpread, score };
-  }
-
-  function getDistrictsOfPart(partMap, part){
-    const arr = [];
-    partMap.forEach((p, idx) => { if (p === part) arr.push(idx); });
-    return arr;
-  }
-
-  function isConnectedPart(partMap, part){
-    const nodes = getDistrictsOfPart(partMap, part);
-    if (nodes.length <= 1) return true;
-
-    const nodeSet = new Set(nodes);
+  function getConnectedComponent(start, allowedSet){
     const visited = new Set();
-    const stack = [nodes[0]];
-    visited.add(nodes[0]);
+    const stack = [start];
+    visited.add(start);
 
     while (stack.length){
       const cur = stack.pop();
       const neigh = adjacency.get(cur) || new Set();
       neigh.forEach(n => {
-        if (nodeSet.has(n) && !visited.has(n)){
+        if (allowedSet.has(n) && !visited.has(n)){
           visited.add(n);
           stack.push(n);
         }
       });
     }
-    return visited.size === nodeSet.size;
+    return visited;
   }
 
-  function canMoveDistrict(partMap, featIdx, fromPart, toPart){
-    const neigh = adjacency.get(featIdx) || new Set();
-    let touchesTo = false;
-    neigh.forEach(n => {
-      if (partMap.get(n) === toPart) touchesTo = true;
+  function isConnectedSubset(subset){
+    const arr = Array.from(subset);
+    if (arr.length <= 1) return true;
+    const reached = getConnectedComponent(arr[0], subset);
+    return reached.size === subset.size;
+  }
+
+  function subsetStats(subset){
+    let kg = 0, count = 0;
+    subset.forEach(idx => {
+      const d = districtStats.get(idx);
+      if (!d) return;
+      kg += d.kg || 0;
+      count += d.count || 0;
     });
-
-    if (!touchesTo){
-      audit.rejectedNoAdj.push({ featIdx, distrito: districtStats.get(featIdx)?.label || featIdx, fromPart, toPart });
-      return false;
-    }
-
-    const trial = new Map(partMap);
-    trial.set(featIdx, toPart);
-
-    const ok = isConnectedPart(trial, fromPart) && isConnectedPart(trial, toPart);
-    if (!ok){
-      audit.rejectedConnectivity.push({ featIdx, distrito: districtStats.get(featIdx)?.label || featIdx, fromPart, toPart });
-    }
-    return ok;
+    return { kg, count };
   }
 
-  function findDistrictByName(nameNorm){
-    let found = null;
-    districtStats.forEach((d, idx) => {
-      if (d.name === nameNorm) found = { ...d, featIdx: idx };
-    });
-    return found;
-  }
+  function pickSeedPair(nodes){
+    if (nodes.length <= 1) return [nodes[0], nodes[0]];
 
-  function trySplitMirafloresSanIsidro(partMap){
-    const mir = findDistrictByName("MIRAFLORES");
-    const san = findDistrictByName("SAN ISIDRO");
-    if (!mir || !san) return partMap;
+    let bestPair = [nodes[0], nodes[nodes.length - 1]];
+    let bestScore = -Infinity;
 
-    const pm = partMap.get(mir.featIdx);
-    const ps = partMap.get(san.featIdx);
-    if (pm !== ps) return partMap;
+    for (let i = 0; i < nodes.length; i++){
+      for (let j = i + 1; j < nodes.length; j++){
+        const a = districtStats.get(nodes[i]);
+        const b = districtStats.get(nodes[j]);
+        if (!a || !b) continue;
 
-    const totals = getPartTotals(partMap);
-    const options = ["A","B","C"]
-      .filter(p => p !== pm)
-      .sort((a,b)=>totals[a].kg - totals[b].kg);
-
-    for (const target of options){
-      const lighter = (mir.kg <= san.kg) ? mir : san;
-      if (canMoveDistrict(partMap, lighter.featIdx, pm, target)){
-        const trial = new Map(partMap);
-        trial.set(lighter.featIdx, target);
-        audit.moved.push({
-          distrito: lighter.label,
-          fromPart: pm,
-          toPart: target,
-          reason: "Split Miraflores/San Isidro"
-        });
-        return trial;
+        const score = Math.abs((a.kg || 0) - (b.kg || 0)) + Math.abs((a.count || 0) - (b.count || 0)) * 2;
+        if (score > bestScore){
+          bestScore = score;
+          bestPair = [nodes[i], nodes[j]];
+        }
       }
     }
-    return partMap;
+    return bestPair;
+  }
+
+  function assignContiguousSubpartsForOneMainPart(partMap, mainPart){
+    const nodes = [];
+    districtStats.forEach((d, idx) => {
+      if (partMap.get(idx) === mainPart) nodes.push(idx);
+    });
+
+    const result = new Map();
+    if (nodes.length === 0) return result;
+    if (nodes.length === 1){
+      result.set(nodes[0], `${mainPart}1`);
+      return result;
+    }
+
+    const fullSet = new Set(nodes);
+    const [seed1, seed2] = pickSeedPair(nodes);
+
+    let group1 = new Set([seed1]);
+    let group2 = new Set([seed2]);
+    const assigned = new Set([seed1, seed2]);
+
+    function frontier(group, otherGroup){
+      const out = [];
+      group.forEach(idx => {
+        const neigh = adjacency.get(idx) || new Set();
+        neigh.forEach(n => {
+          if (!fullSet.has(n)) return;
+          if (assigned.has(n)) return;
+          if (otherGroup.has(n)) return;
+          out.push(n);
+        });
+      });
+      return Array.from(new Set(out));
+    }
+
+    while (assigned.size < nodes.length){
+      const f1 = frontier(group1, group2);
+      const f2 = frontier(group2, group1);
+      let candidates = [];
+
+      f1.forEach(idx => candidates.push({ idx, target: 1 }));
+      f2.forEach(idx => candidates.push({ idx, target: 2 }));
+
+      if (!candidates.length){
+        const leftovers = nodes.filter(n => !assigned.has(n));
+        leftovers.forEach(idx => {
+          const s1 = subsetStats(new Set([...group1, idx]));
+          const s2 = subsetStats(group2);
+          const score1 = Math.abs(s1.kg - s2.kg) + Math.abs(s1.count - s2.count) * 8;
+
+          const t1 = subsetStats(group1);
+          const t2 = subsetStats(new Set([...group2, idx]));
+          const score2 = Math.abs(t1.kg - t2.kg) + Math.abs(t1.count - t2.count) * 8;
+
+          if (score1 <= score2) group1.add(idx);
+          else group2.add(idx);
+
+          assigned.add(idx);
+        });
+        break;
+      }
+
+      let best = null;
+
+      for (const cand of candidates){
+        const idx = cand.idx;
+        const test1 = new Set(group1);
+        const test2 = new Set(group2);
+
+        if (cand.target === 1) test1.add(idx);
+        else test2.add(idx);
+
+        const s1 = subsetStats(test1);
+        const s2 = subsetStats(test2);
+        const balanceScore = Math.abs(s1.kg - s2.kg) + Math.abs(s1.count - s2.count) * 8;
+
+        if (!best || balanceScore < best.score){
+          best = { idx, target: cand.target, score: balanceScore };
+        }
+      }
+
+      if (!best) break;
+
+      if (best.target === 1) group1.add(best.idx);
+      else group2.add(best.idx);
+
+      assigned.add(best.idx);
+    }
+
+    if (!isConnectedSubset(group1) || !isConnectedSubset(group2)){
+      group1 = new Set([seed1]);
+      group2 = new Set([seed2]);
+      assigned.clear();
+      assigned.add(seed1);
+      assigned.add(seed2);
+
+      while (assigned.size < nodes.length){
+        const pending = nodes.filter(n => !assigned.has(n));
+        let moved = false;
+
+        for (const idx of pending){
+          const neigh = adjacency.get(idx) || new Set();
+          const touches1 = Array.from(neigh).some(n => group1.has(n));
+          const touches2 = Array.from(neigh).some(n => group2.has(n));
+
+          if (!touches1 && !touches2) continue;
+
+          const s1 = subsetStats(new Set([...group1, idx]));
+          const s2 = subsetStats(group2);
+          const score1 = Math.abs(s1.kg - s2.kg) + Math.abs(s1.count - s2.count) * 8;
+
+          const t1 = subsetStats(group1);
+          const t2 = subsetStats(new Set([...group2, idx]));
+          const score2 = Math.abs(t1.kg - t2.kg) + Math.abs(t1.count - t2.count) * 8;
+
+          if (touches1 && (!touches2 || score1 <= score2)) group1.add(idx);
+          else group2.add(idx);
+
+          assigned.add(idx);
+          moved = true;
+        }
+
+        if (!moved){
+          pending.forEach(idx => {
+            const s1 = subsetStats(new Set([...group1, idx]));
+            const s2 = subsetStats(group2);
+            const score1 = Math.abs(s1.kg - s2.kg) + Math.abs(s1.count - s2.count) * 8;
+
+            const t1 = subsetStats(group1);
+            const t2 = subsetStats(new Set([...group2, idx]));
+            const score2 = Math.abs(t1.kg - t2.kg) + Math.abs(t1.count - t2.count) * 8;
+
+            if (score1 <= score2) group1.add(idx);
+            else group2.add(idx);
+
+            assigned.add(idx);
+          });
+        }
+      }
+    }
+
+    group1.forEach(idx => result.set(idx, `${mainPart}1`));
+    group2.forEach(idx => result.set(idx, `${mainPart}2`));
+
+    return result;
   }
 
   function assignBalancedSubpartsForMap(partMap){
-    const result = new Map();
-
+    const out = new Map();
     ["A","B","C"].forEach(mainPart => {
-      const items = [];
-      districtStats.forEach((d, idx) => {
-        if (partMap.get(idx) === mainPart){
-          items.push({
-            featIdx: idx,
-            kg: d.kg,
-            count: d.count
-          });
-        }
-      });
-
-      items.sort((a,b) => (b.kg - a.kg) || (b.count - a.count));
-
-      let g1Kg = 0, g2Kg = 0, g1Ct = 0, g2Ct = 0;
-      for (const item of items){
-        const score1 = Math.abs((g1Kg + item.kg) - g2Kg) + Math.abs((g1Ct + item.count) - g2Ct) * 8;
-        const score2 = Math.abs(g1Kg - (g2Kg + item.kg)) + Math.abs(g1Ct - (g2Ct + item.count)) * 8;
-
-        if (score1 <= score2){
-          result.set(item.featIdx, `${mainPart}1`);
-          g1Kg += item.kg;
-          g1Ct += item.count;
-        } else {
-          result.set(item.featIdx, `${mainPart}2`);
-          g2Kg += item.kg;
-          g2Ct += item.count;
-        }
-      }
+      const partial = assignContiguousSubpartsForOneMainPart(partMap, mainPart);
+      partial.forEach((sub, idx) => out.set(idx, sub));
     });
-
-    return result;
+    return out;
   }
 
   function assignPartsClie(){
@@ -815,7 +1021,9 @@
     const n = sorted.length;
     if (n === 0) return;
 
-    const size = Math.ceil(n / 3), cut1 = size, cut2 = size * 2;
+    const size = Math.ceil(n / 3);
+    const cut1 = size;
+    const cut2 = size * 2;
 
     for (let i=0; i<n; i++){
       const r = sorted[i];
@@ -834,11 +1042,12 @@
 
     featurePartByIdxClie = new Map();
     for (const [idx, counts] of byFeat){
-      let maj="A", max=-1;
-      for (const p of ["A","B","C"]) {
+      let maj = "A";
+      let max = -1;
+      for (const p of ["A","B","C"]){
         if ((counts[p] || 0) > max){
-          max=(counts[p] || 0);
-          maj=p;
+          max = (counts[p] || 0);
+          maj = p;
         }
       }
       featurePartByIdxClie.set(idx, maj);
@@ -862,141 +1071,6 @@
     }
   }
 
-  function optimizeKgFromClie(){
-    audit.moved = [];
-    audit.rejectedNoAdj = [];
-    audit.rejectedConnectivity = [];
-    audit.rejectedNoImprove = [];
-
-    const baseClieNoSwap = new Map();
-    featurePartByIdxClie.forEach((part, idx) => {
-      baseClieNoSwap.set(idx, swapMainPart(part));
-    });
-
-    featurePartByIdxKg = new Map(baseClieNoSwap);
-    audit.initialTotals = getPartTotals(featurePartByIdxKg);
-
-    featurePartByIdxKg = trySplitMirafloresSanIsidro(featurePartByIdxKg);
-
-    let improved = true;
-    let guard = 0;
-
-    while (improved && guard < MAX_ITERS){
-      improved = false;
-      guard++;
-
-      const totals = getPartTotals(featurePartByIdxKg);
-      const base = scoreBreakdown(totals);
-      const sortedParts = ["A","B","C"].sort((a,b)=>totals[b].kg - totals[a].kg || totals[b].count - totals[a].count);
-      const heavy = sortedParts[0];
-
-      let bestMove = null;
-
-      districtStats.forEach((d, featIdx) => {
-        const fromPart = featurePartByIdxKg.get(featIdx);
-        if (fromPart !== heavy) return;
-
-        const neighParts = new Set();
-        (adjacency.get(featIdx) || new Set()).forEach(n => {
-          const p = featurePartByIdxKg.get(n);
-          if (p && p !== fromPart) neighParts.add(p);
-        });
-
-        neighParts.forEach(toPart => {
-          if (!canMoveDistrict(featurePartByIdxKg, featIdx, fromPart, toPart)) return;
-
-          const trial = new Map(featurePartByIdxKg);
-          trial.set(featIdx, toPart);
-
-          const trialTotals = getPartTotals(trial);
-          const next = scoreBreakdown(trialTotals);
-
-          const improvesKgClearly = next.kgSpread < base.kgSpread;
-          const scoreImproves = next.score < base.score;
-          const clientsNotTooWorse = next.ctSpread <= (base.ctSpread + 1);
-
-          if ((scoreImproves || (improvesKgClearly && clientsNotTooWorse))){
-            const delta = base.score - next.score;
-            const candidate = {
-              featIdx,
-              distrito: d.label,
-              fromPart,
-              toPart,
-              delta,
-              base,
-              next,
-              trial
-            };
-            if (!bestMove || candidate.delta > bestMove.delta || (candidate.next.kgSpread < bestMove.next.kgSpread)){
-              bestMove = candidate;
-            }
-          } else {
-            audit.rejectedNoImprove.push({
-              distrito: d.label,
-              fromPart,
-              toPart,
-              baseScore: +base.score.toFixed(2),
-              nextScore: +next.score.toFixed(2),
-              baseKgSpread: +base.kgSpread.toFixed(2),
-              nextKgSpread: +next.kgSpread.toFixed(2),
-              baseCtSpread: base.ctSpread,
-              nextCtSpread: next.ctSpread
-            });
-          }
-        });
-      });
-
-      if (bestMove){
-        featurePartByIdxKg = bestMove.trial;
-        audit.moved.push({
-          distrito: bestMove.distrito,
-          fromPart: bestMove.fromPart,
-          toPart: bestMove.toPart,
-          reason: "Optimize Kg + soft clients",
-          baseScore: +bestMove.base.score.toFixed(2),
-          nextScore: +bestMove.next.score.toFixed(2),
-          baseKgSpread: +bestMove.base.kgSpread.toFixed(2),
-          nextKgSpread: +bestMove.next.kgSpread.toFixed(2),
-          baseCtSpread: bestMove.base.ctSpread,
-          nextCtSpread: bestMove.next.ctSpread
-        });
-        improved = true;
-      }
-    }
-
-    audit.finalTotals = getPartTotals(featurePartByIdxKg);
-
-    const swappedKg = new Map();
-    featurePartByIdxKg.forEach((part, idx) => {
-      swappedKg.set(idx, swapMainPart(part));
-    });
-    featurePartByIdxKg = swappedKg;
-
-    featureSubpartByIdxKg = assignBalancedSubpartsForMap(featurePartByIdxKg);
-
-    for (const r of records){
-      const p = featurePartByIdxKg.get(r.featIdx) || "A";
-      const sp = featureSubpartByIdxKg.get(r.featIdx) || `${p}1`;
-      r.partKg = p;
-      r.subpartKg = sp;
-      r.proposedDaysKg = partToDays[p];
-      r.proposedLettersKg = partToFreqLetters[p];
-    }
-
-    if (ENABLE_AUDIT){
-      console.group("AUDITORIA PROP. KG");
-      console.log("PARAMS", { KG_WEIGHT, CLIENT_WEIGHT, KG_PRIORITY_FACTOR, MAX_ITERS });
-      console.log("TOTALS CLIE/INITIAL", audit.initialTotals);
-      console.log("TOTALS KG/FINAL", audit.finalTotals);
-      console.table(audit.adjacencyCount.sort((a,b)=>a.vecinos-b.vecinos));
-      console.table(audit.moved);
-      console.table(audit.rejectedNoAdj.slice(0, 100));
-      console.table(audit.rejectedConnectivity.slice(0, 100));
-      console.table(audit.rejectedNoImprove.slice(0, 100));
-      console.groupEnd();
-    }
-  }
-
   function ingestRows(rows){
     const startIdx = hasHeader(rows[0]) ? 1 : 0;
     const prelim = [];
@@ -1012,7 +1086,8 @@
       const name = (row[7] ?? "").toString().trim();
       const canal = (row[21] ?? "").toString().trim();
       const interloc = (row[26] ?? "").toString().trim();
-      const lat = num(row[28]), lon = num(row[29]);
+      const lat = num(row[28]);
+      const lon = num(row[29]);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
       const office = (row[46] ?? "").toString().trim();
@@ -1049,8 +1124,10 @@
         featIdx: container.idx, geoDistName,
         hadZ3: days.length > 2,
         kg,
-        partClie:null, subpartClie:null, proposedDaysClie:[], proposedLettersClie:"",
-        partKg:null, subpartKg:null, proposedDaysKg:[], proposedLettersKg:""
+        partClie:null,
+        subpartClie:null,
+        proposedDaysClie:[],
+        proposedLettersClie:""
       });
     }
 
@@ -1064,23 +1141,45 @@
     }
 
     records = deduped;
-    populateCanalFilter(records.map(r=>r.canal).filter(Boolean));
+    populateCanalFilter(records.map(r => r.canal).filter(Boolean));
     buildDistrictStats();
     assignPartsClie();
-    optimizeKgFromClie();
     refreshLayers();
+  }
+
+  function getFilteredRowsForExport(){
+    const out = [];
+    for (const r of records){
+      if (!isValidOffice(r.office)) continue;
+      if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+      if (filterZ3 && !r.hadZ3) continue;
+
+      const pass = (selectedDay === "Todos")
+        ? true
+        : (viewMode === "Actual" ? r.days.includes(selectedDay) : (getProposalFields(r).proposedDays || []).includes(selectedDay));
+
+      if (!pass) continue;
+      out.push(r);
+    }
+    return out;
+  }
+
+  function csvEscape(v){
+    const s = (v ?? "").toString();
+    return /[",
+]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
   }
 
   document.getElementById('exportBtn').addEventListener('click', ()=>{
     const rows = getFilteredRowsForExport();
     const headers = [
       "Codigo Cliente","Nombre Cliente","Distrito Catalogo","Distrito GeoJson",
-      "Frecuencia Actual","Frecuencia Prop Clie","Frecuencia Prop Kg",
+      "Frecuencia Actual","Frecuencia Prop Clie",
       "Canal","Ruta","Latitud","Longitud","Oficina","Kg_Prom",
-      "Parte_Clie","Subparte_Clie","Parte_Kg","Subparte_Kg"
+      "Parte_Clie","Subparte_Clie"
     ];
 
-const csv = [
+   const csv = [
   headers.join(",")
 ].concat(
   rows.map(r =>
@@ -1118,33 +1217,9 @@ const csv = [
     URL.revokeObjectURL(url);
   });
 
-  function getFilteredRowsForExport(){
-    const out = [];
-    for (const r of records){
-      if (!isValidOffice(r.office)) continue;
-      if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
-      if (filterZ3 && !r.hadZ3) continue;
-
-      const pass = (selectedDay === "Todos") ? true :
-        (viewMode === "Actual" ? r.days.includes(selectedDay) : (getProposalFields(r).proposedDays || []).includes(selectedDay));
-      if (!pass) continue;
-
-      out.push(r);
-    }
-    return out;
-  }
-
-function csvEscape(v) {
-  const s = (v ?? "").toString();
-
-  return /[",\n]/.test(s)
-    ? `"${s.replace(/"/g, '""')}"`
-    : s;
-}
-
   document.getElementById('viewTabs').addEventListener('click', (e)=>{
     if (e.target.tagName === "BUTTON"){
-      document.querySelectorAll('#viewTabs button').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('#viewTabs button').forEach(b => b.classList.remove('active'));
       e.target.classList.add('active');
       viewMode = e.target.dataset.view || "Actual";
       refreshLayers();
@@ -1153,7 +1228,7 @@ function csvEscape(v) {
 
   document.getElementById('dayFilter').addEventListener('click', (e)=>{
     if (e.target.tagName === "BUTTON"){
-      document.querySelectorAll('#dayFilter button').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('#dayFilter button').forEach(b => b.classList.remove('active'));
       e.target.classList.add('active');
       selectedDay = e.target.dataset.day;
       refreshLayers();
@@ -1192,20 +1267,20 @@ function csvEscape(v) {
     .then(geo => {
       areaFeatures = (geo && geo.type === "FeatureCollection")
         ? geo
-        : { type:"FeatureCollection", features: [geo] };
+        : { type:"FeatureCollection", features:[geo] };
 
-      areaFeatures.features.forEach((f,i)=>{
-        if(!f.properties) f.properties={};
-        f.properties.__idx=i;
+      areaFeatures.features.forEach((f, i) => {
+        if (!f.properties) f.properties = {};
+        f.properties.__idx = i;
       });
 
       boundaryLayer.addData(areaFeatures);
       buildAdjacency();
 
-      try {
-        const b=boundaryLayer.getBounds();
+      try{
+        const b = boundaryLayer.getBounds();
         if (b && b.isValid()) map.fitBounds(b.pad(0.05));
-      } catch(e){}
+      }catch(e){}
 
       Papa.parse(VOL_URL, {
         download:true,
