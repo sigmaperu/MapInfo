@@ -1168,14 +1168,14 @@
     }
     return out;
   }
+ 
+function csvEscape(v) {
+  const s = (v ?? "").toString();
 
-  function csvEscape(v){
-    const s = (v ?? "").toString();
-    return /[",
-]/.test(s)
-      ? `"${s.replace(/"/g,'""')}"`
-      : s;
-  }
+  return /[",\n]/.test(s)
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
+}
 
   document.getElementById('viewTabs').addEventListener('click', (e)=>{
     if (e.target.tagName === "BUTTON"){
