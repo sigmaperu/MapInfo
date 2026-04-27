@@ -69,7 +69,7 @@
  #map{ height: calc(100vh - 86px); }
  .legend{
   position:absolute; bottom:12px; left:12px; z-index:600; background:rgba(15,21,32,.94);
-  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width:520px; box-shadow:var(--elev);
+  border:1px solid var(--md-outline); border-radius:12px; padding:10px; font-size:12px; max-width:560px; box-shadow:var(--elev);
   backdrop-filter: blur(8px);
  }
  .legend h4{ margin:0 0 4px 0; font-size:12px; }
@@ -173,7 +173,14 @@
   const partToDays = { "A":["Lunes","Jueves"], "B":["Martes","Viernes"], "C":["Miércoles","Sábado"] };
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
 
-  const basePartColors = { A:"#2563eb", B:"#f59e0b", C:"#ec4899" };
+  const subpartPalette = {
+    A1: { color:"#0f172a", fillColor:"#2563eb", fillOpacity:0.38 },
+    A2: { color:"#0f172a", fillColor:"#8b5cf6", fillOpacity:0.38 },
+    B1: { color:"#0f172a", fillColor:"#f59e0b", fillOpacity:0.38 },
+    B2: { color:"#0f172a", fillColor:"#10b981", fillOpacity:0.38 },
+    C1: { color:"#0f172a", fillColor:"#f43f5e", fillOpacity:0.38 },
+    C2: { color:"#0f172a", fillColor:"#14b8a6", fillOpacity:0.38 }
+  };
 
   const KG_WEIGHT = 1.0;
   const CLIENT_WEIGHT = 8.0;
@@ -265,57 +272,11 @@
     return "B";
   }
 
-  function swapSubpartLabel(sub){
-    if (!sub || sub.length < 2) return sub;
-    const main = sub[0];
-    const idx = sub.slice(1);
-    return `${swapMainPart(main)}${idx}`;
-  }
-
-  function hexToRgb(hex){
-    const h = hex.replace('#','');
-    return {
-      r: parseInt(h.substring(0,2),16),
-      g: parseInt(h.substring(2,4),16),
-      b: parseInt(h.substring(4,6),16)
-    };
-  }
-
-  function rgbToHex(r,g,b){
-    return "#" + [r,g,b].map(v => {
-      const x = Math.max(0, Math.min(255, Math.round(v)));
-      return x.toString(16).padStart(2,'0');
-    }).join('');
-  }
-
-  function mixColor(hex, targetHex, amount){
-    const a = hexToRgb(hex);
-    const b = hexToRgb(targetHex);
-    return rgbToHex(
-      a.r + (b.r - a.r) * amount,
-      a.g + (b.g - a.g) * amount,
-      a.b + (b.b - a.b) * amount
-    );
-  }
-
   function getSubpartStyle(subpart){
-    if (!subpart) return { color:'#ef4444', fillColor:'#ef4444', fillOpacity:0.08 };
-    const main = subpart[0];
-    const suffix = subpart.slice(1);
-    const base = basePartColors[main] || '#6b7280';
-
-    if (suffix === "1"){
-      return {
-        color: mixColor(base, "#ffffff", 0.10),
-        fillColor: mixColor(base, "#ffffff", 0.22),
-        fillOpacity: 0.28
-      };
-    }
-
-    return {
-      color: mixColor(base, "#000000", 0.10),
-      fillColor: mixColor(base, "#ffffff", 0.08),
-      fillOpacity: 0.18
+    return subpartPalette[subpart] || {
+      color:"#0f172a",
+      fillColor:"#ef4444",
+      fillOpacity:0.12
     };
   }
 
@@ -447,7 +408,7 @@
     return out;
   }
 
-  function partSummaryWithFilters(){
+  function subpartSummaryWithFilters(){
     const res = {
       A1:{count:0,kg:0}, A2:{count:0,kg:0},
       B1:{count:0,kg:0}, B2:{count:0,kg:0},
@@ -490,7 +451,7 @@
   const legendEl = document.getElementById('legend');
   function renderLegend(){
     const channelSummary = channelSummaryWithFilters();
-    const items = Object.keys(channelSummary).sort().map(canal => {
+    const channelItems = Object.keys(channelSummary).sort().map(canal => {
       const color = colorForChannel(canal);
       const info = channelSummary[canal];
       return `<div class="row">
@@ -501,13 +462,23 @@
       </div>`;
     }).join("");
 
-    const subSummary = partSummaryWithFilters();
+    const subSummary = subpartSummaryWithFilters();
     const daySummary = daySummaryWithFilters();
 
     let header = "🎯 Atención actual";
     if (viewMode === "PropClie") header = "🧭 Propuesta clientes";
     if (viewMode === "PropKg") header = "⚖️ Propuesta Kg auditada";
     const z3 = filterZ3 ? `<span class="pill">+Z3</span>` : "";
+
+    const subpartRows = ["A1","A2","B1","B2","C1","C2"].map(sp => {
+      const st = getSubpartStyle(sp);
+      return `<div class="row">
+        <span class="swatch" style="background:${st.fillColor}; border-color:${st.color}"></span>
+        <strong>${sp}</strong>
+        <span class="pill">${subSummary[sp].count} clientes</span>
+        <span class="pill">${subSummary[sp].kg.toFixed(0)} kg</span>
+      </div>`;
+    }).join("");
 
     legendEl.innerHTML = `
       <h4>${header} ${z3}</h4>
@@ -516,16 +487,9 @@
         <span class="pill">Canal:</span> <span>${escapeHtml(selectedCanal)}</span>
       </div>
       <div style="margin:6px 0 4px; color:#9fb0c3;">Canales visibles (afectados por filtros)</div>
-      ${items || '<div class="row" style="color:#9fb0c3;">(Sin datos)</div>'}
-      <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por subparte (sin filtro de día)</div>
-      <div class="row">
-        <span class="pill">A1</span> ${subSummary.A1.count} · ${subSummary.A1.kg.toFixed(0)} kg
-        <span class="pill">A2</span> ${subSummary.A2.count} · ${subSummary.A2.kg.toFixed(0)} kg
-        <span class="pill">B1</span> ${subSummary.B1.count} · ${subSummary.B1.kg.toFixed(0)} kg
-        <span class="pill">B2</span> ${subSummary.B2.count} · ${subSummary.B2.kg.toFixed(0)} kg
-        <span class="pill">C1</span> ${subSummary.C1.count} · ${subSummary.C1.kg.toFixed(0)} kg
-        <span class="pill">C2</span> ${subSummary.C2.count} · ${subSummary.C2.kg.toFixed(0)} kg
-      </div>
+      ${channelItems || '<div class="row" style="color:#9fb0c3;">(Sin datos)</div>'}
+      <div style="margin:8px 0 4px; color:#9fb0c3;">Subparticiones</div>
+      ${subpartRows}
       <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por día (sin filtro de día)</div>
       <div class="row">
         L: <span class="pill">${daySummary.L.count}</span> <span class="pill">${daySummary.L.kg.toFixed(0)} kg</span>
@@ -570,7 +534,8 @@
           const st = getSubpartStyle(subpart);
           return {
             color: st.color,
-            weight: 2.2,
+            weight: 2.8,
+            opacity: 1,
             fillColor: st.fillColor,
             fillOpacity: st.fillOpacity
           };
@@ -1115,7 +1080,7 @@
       "Parte_Clie","Subparte_Clie","Parte_Kg","Subparte_Kg"
     ];
 
-  const csv = [
+const csv = [
   headers.join(",")
 ].concat(
   rows.map(r =>
@@ -1168,7 +1133,7 @@
     }
     return out;
   }
- 
+
 function csvEscape(v) {
   const s = (v ?? "").toString();
 
