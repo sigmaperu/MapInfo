@@ -23,13 +23,16 @@
   --chip-bg:#0d1522;
   --elev: 0 2px 10px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
  }
+
  *{ box-sizing:border-box; }
+
  body{
   margin:0;
   font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   background:var(--md-bg);
   color:var(--md-text);
  }
+
  header{
   position:sticky;
   top:0;
@@ -43,22 +46,26 @@
   background:linear-gradient(180deg, #0b0f14 0%, #0f1520 100%);
   box-shadow:var(--elev);
  }
+
  h1{
   font-size:15px;
   margin:0;
   letter-spacing:.2px;
   font-weight:700;
  }
+
  .muted{
   color:var(--md-muted);
   font-size:11px;
  }
+
  .controls{
   display:flex;
   gap:8px;
   align-items:center;
   flex-wrap:wrap;
  }
+
  .group{
   display:flex;
   gap:6px;
@@ -68,6 +75,7 @@
   border:1px solid var(--md-outline);
   border-radius:10px;
  }
+
  .segmented{
   display:flex;
   overflow:hidden;
@@ -75,6 +83,7 @@
   border:1px solid var(--md-outline);
   background:var(--chip-bg);
  }
+
  .segmented button{
   background:transparent;
   color:var(--md-text);
@@ -84,13 +93,16 @@
   font-weight:700;
   font-size:12px;
  }
+
  .segmented button.active{
   background:var(--md-primary);
   color:#0a0716;
  }
+
  .segmented button + button{
   border-left:1px solid var(--md-outline);
  }
+
  label.switch{
   display:inline-flex;
   align-items:center;
@@ -100,6 +112,7 @@
   font-weight:600;
   font-size:12px;
  }
+
  .toggle{
   width:44px;
   height:24px;
@@ -109,6 +122,7 @@
   position:relative;
   transition:.2s;
  }
+
  .knob{
   width:20px;
   height:20px;
@@ -120,6 +134,7 @@
   transition:.2s;
   box-shadow:0 1px 2px rgba(0,0,0,.5);
  }
+
  input[type="checkbox"].toggle-input{ display:none; }
  input[type="checkbox"].toggle-input:checked + .toggle{ background:var(--md-secondary); }
  input[type="checkbox"].toggle-input:checked + .toggle .knob{ left:22px; }
@@ -134,6 +149,7 @@
   font-weight:600;
   font-size:12px;
  }
+
  .btn{
   padding:6px 10px;
   border:1px solid var(--md-outline);
@@ -145,6 +161,7 @@
   letter-spacing:.3px;
   font-size:12px;
  }
+
  .btn:hover{ filter:brightness(1.12); }
 
  #map{ height: calc(100vh - 86px); }
@@ -153,7 +170,7 @@
   position:absolute;
   bottom:12px;
   left:12px;
-  z-index:600;
+  z-index:700;
   background:rgba(15,21,32,.94);
   border:1px solid var(--md-outline);
   border-radius:12px;
@@ -163,10 +180,12 @@
   box-shadow:var(--elev);
   backdrop-filter: blur(8px);
  }
+
  .legend h4{
   margin:0 0 4px 0;
   font-size:12px;
  }
+
  .legend .row{
   display:flex;
   align-items:center;
@@ -174,12 +193,14 @@
   margin:4px 0;
   flex-wrap:wrap;
  }
+
  .swatch{
   width:12px;
   height:12px;
   border-radius:2px;
   border:1px solid #0003;
  }
+
  .pill{
   font-size:10px;
   padding:2px 6px;
@@ -188,11 +209,14 @@
   color:var(--md-muted);
   background:var(--chip-bg);
  }
+
  a, a:visited{
   color:#93c5fd;
   text-decoration:none;
  }
+
  a:hover{ text-decoration:underline; }
+
  .freq{
   display:inline-block;
   font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -204,6 +228,7 @@
   border-radius:6px;
   border:1px solid #111827;
  }
+
  .popup-line{ margin:3px 0; }
  .popup-muted{ color:#9CA3AF; }
 
@@ -211,22 +236,26 @@
   min-width:240px;
   line-height:1.35;
  }
+
  .district-popup h4{
   margin:0 0 8px 0;
   font-size:14px;
   font-weight:800;
   color:#e6edf3;
  }
+
  .district-popup .stat{
   display:flex;
   justify-content:space-between;
   gap:10px;
   margin:4px 0;
  }
+
  .district-popup .k{
   color:#9fb0c3;
   font-weight:600;
  }
+
  .district-popup .v{
   color:#f8fafc;
   font-weight:800;
@@ -238,16 +267,20 @@
   border:1px solid #223144;
   border-radius:10px;
   box-shadow:var(--elev);
+  pointer-events:none;
  }
+
  .leaflet-popup-content-wrapper{
   background:#0f1722;
   color:#e5edf6;
   border:1px solid #243245;
   border-radius:12px;
  }
+
  .leaflet-popup-tip{
   background:#0f1722;
  }
+
  .leaflet-control-container .leaflet-bottom.leaflet-right{
   right:16px;
   bottom:16px;
@@ -365,19 +398,23 @@
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   map.createPane('zonesPane');
-  map.getPane('zonesPane').style.zIndex = 300;
+  map.getPane('zonesPane').style.zIndex = 450;
+
+  map.createPane('districtPane');
+  map.getPane('districtPane').style.zIndex = 500;
 
   map.createPane('markersPane');
-  map.getPane('markersPane').style.zIndex = 600;
+  map.getPane('markersPane').style.zIndex = 650;
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution:'© OpenStreetMap'
   }).addTo(map);
 
-  const currentLayer = L.layerGroup().addTo(map);
-  const proposedLayer = L.layerGroup();
+  const currentLayer = L.layerGroup([], { pane:'markersPane' }).addTo(map);
+  const proposedLayer = L.layerGroup([], { pane:'markersPane' });
   const boundaryLayer = L.geoJSON(null, {
     pane:'zonesPane',
+    interactive:false,
     style: { color:'#ef4444', weight:1, fill:false }
   }).addTo(map);
 
@@ -391,6 +428,7 @@
   let districtStats = new Map();
   let channelPalette = {};
   let splitAxisByPart = { A:'NS', B:'NS', C:'NS' };
+  let districtGeoJsonLayer = null;
 
   function normalize(s){
     return (s ?? "")
@@ -523,7 +561,7 @@
     return { part:null, subpart:null, proposedDays:[], proposedLetters:"" };
   }
 
-  function buildPopUp(r){
+  function buildClientPopup(r){
     const gm = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
     const prop = getProposalFields(r);
     const proposedDaysStr = (prop.proposedDays && prop.proposedDays.length) ? prop.proposedDays.join(", ") : "—";
@@ -539,6 +577,7 @@
         <div class="popup-line"><strong>Nombre:</strong> ${escapeHtml(r.name || "")}</div>
         <div class="popup-line"><strong>Canal:</strong> ${escapeHtml(r.canal || "")}</div>
         <div class="popup-line"><strong>Distrito:</strong> ${escapeHtml(distShown)}</div>
+        <div class="popup-line"><strong>Interlocutor:</strong> ${escapeHtml(r.interlocutor || "")}</div>
         <div class="popup-line"><strong>Oficina:</strong> ${escapeHtml(r.office || "")}</div>
         <div class="popup-line"><strong>Kg promedio:</strong> ${(r.kg || 0).toFixed(1)} kg prom.</div>
         <hr style="border:none;border-top:1px solid #1f2937; margin:6px 0;">
@@ -740,8 +779,50 @@
     else map.setView([-12.0464, -77.0428], 10);
   }
 
+  function baseDistrictStyle(idx){
+    let subpart = null;
+    if (viewMode === "PropClie") subpart = featureSubpartByIdxClie.get(idx);
+
+    if (subpart){
+      const st = getSubpartStyle(subpart);
+      return {
+        pane:'districtPane',
+        color: st.color,
+        weight: 2.8,
+        opacity: 1,
+        fillColor: st.fillColor,
+        fillOpacity: st.fillOpacity
+      };
+    }
+    return {
+      pane:'districtPane',
+      color:'#ef4444',
+      weight:1.3,
+      opacity:1,
+      fillColor:'#ef4444',
+      fillOpacity:0.03
+    };
+  }
+
+  function highlightDistrict(layer, idx){
+    const style = baseDistrictStyle(idx);
+    layer.setStyle({
+      color: style.color,
+      weight: Math.max(style.weight + 1.4, 4),
+      opacity: 1,
+      fillColor: style.fillColor,
+      fillOpacity: Math.min((style.fillOpacity || 0.12) + 0.14, 0.68)
+    });
+    if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) layer.bringToFront();
+  }
+
+  function resetDistrictStyle(layer, idx){
+    layer.setStyle(baseDistrictStyle(idx));
+  }
+
   function renderDistrictsColoredByPart(){
     districtsLayerHolder.clearLayers();
+    districtGeoJsonLayer = null;
     if (!areaFeatures) return;
 
     areaFeatures.features.forEach((f, i) => {
@@ -749,48 +830,38 @@
       f.properties.__idx = i;
     });
 
-    const layer = L.geoJSON(areaFeatures, {
-      pane:'zonesPane',
+    districtGeoJsonLayer = L.geoJSON(areaFeatures, {
+      pane:'districtPane',
+      interactive:true,
       style: (feature) => {
         const idx = feature.properties.__idx;
-        let subpart = null;
-        if (viewMode === "PropClie") subpart = featureSubpartByIdxClie.get(idx);
-
-        if (subpart){
-          const st = getSubpartStyle(subpart);
-          return {
-            color: st.color,
-            weight: 2.8,
-            opacity: 1,
-            fillColor: st.fillColor,
-            fillOpacity: st.fillOpacity
-          };
-        }
-        return { color:'#ef4444', weight:1, fillOpacity:0 };
+        return baseDistrictStyle(idx);
       },
-      onEachFeature: (feature, polygonLayer) => {
+      onEachFeature: (feature, layer) => {
         const idx = feature.properties.__idx;
         const name = getFeatureDistName(feature);
 
-        polygonLayer.bindTooltip(name, {
+        layer.bindTooltip(name, {
           direction:'auto',
           opacity:0.95,
           sticky:true,
           className:'district-tip',
-          permanent:false
+          permanent:false,
+          pane:'popupPane'
         });
 
-        polygonLayer.on('mouseover', function(){
-          this.setStyle({ weight: 4, opacity: 1, fillOpacity: 0.55 });
+        layer.on('mouseover', function(){
+          highlightDistrict(layer, idx);
         });
 
-        polygonLayer.on('mouseout', function(){
-          renderDistrictsColoredByPart();
+        layer.on('mouseout', function(){
+          resetDistrictStyle(layer, idx);
         });
 
-        polygonLayer.on('click', function(e){
+        layer.on('click', function(e){
           const html = buildDistrictPopup(idx);
-          L.popup({ maxWidth: 320 })
+          highlightDistrict(layer, idx);
+          L.popup({ maxWidth: 320, autoPan:true })
             .setLatLng(e.latlng)
             .setContent(html)
             .openOn(map);
@@ -798,7 +869,7 @@
       }
     });
 
-    layer.addTo(districtsLayerHolder);
+    districtsLayerHolder.addLayer(districtGeoJsonLayer);
   }
 
   function refreshLayers(){
@@ -827,7 +898,7 @@
           color:"#0b1221",
           fillColor: color,
           fillOpacity:0.95
-        }).bindPopup(buildPopUp(r));
+        }).bindPopup(buildClientPopup(r));
 
         if (viewMode === "Actual") currentLayer.addLayer(marker);
         else proposedLayer.addLayer(marker);
@@ -938,8 +1009,6 @@
           idx,
           kg: d.kg,
           count: d.count,
-          x: d.cx,
-          y: d.cy,
           coordNS: d.cy,
           coordEW: d.cx
         });
@@ -1062,7 +1131,7 @@
       const route = (row[12] ?? "").toString().trim();
       const name = (row[7] ?? "").toString().trim();
       const canal = (row[21] ?? "").toString().trim();
-      const interloc = (row[26] ?? "").toString().trim();
+      const interlocutor = (row[26] ?? "").toString().trim();
       const lat = num(row[28]);
       const lon = num(row[29]);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
@@ -1080,7 +1149,7 @@
 
       const propuestaFlag = (row[55] ?? "").toString().trim();
       if (normalize(propuestaFlag) === PROPUESTA_BAJA_VAL) continue;
-      if (interloc === EXCLUDE_INTERLOC) continue;
+      if (interlocutor === EXCLUDE_INTERLOC) continue;
 
       const canalNorm = normalize(canal);
       const nameNorm = normalizeName(name);
@@ -1096,9 +1165,20 @@
       const kg = kgByCode.get(code) || 0;
 
       prelim.push({
-        code, name, canal, canalNorm, distrito: csvDistrito, office, route,
-        daysRaw, days, freqLetters, lat, lon,
-        featIdx: container.idx, geoDistName,
+        code,
+        name,
+        distrito: csvDistrito,
+        route,
+        canal,
+        interlocutor,
+        lat,
+        lon,
+        office,
+        featIdx: container.idx,
+        geoDistName,
+        daysRaw,
+        days,
+        freqLetters,
         hadZ3: days.length > 2,
         kg,
         partClie:null,
@@ -1149,13 +1229,41 @@ function csvEscape(v) {
     : s;
 }
 
+  // Orden corregido:
+  // [0] Codigo Cliente
+  // [1] Nombre Cliente
+  // [2] Distrito Catalogo
+  // [3] Distrito GeoJson
+  // [4] Frecuencia Actual
+  // [5] Frecuencia Prop Clie
+  // [6] Canal
+  // [7] Interlocutor
+  // [8] Ruta
+  // [9] Latitud
+  // [10] Longitud
+  // [11] Oficina
+  // [12] Kg_Prom
+  // [13] Parte_Clie
+  // Eliminada la columna [14] anterior; no se exporta Eje_Subparte
+  // [14] Subparte_Clie
   document.getElementById('exportBtn').addEventListener('click', ()=>{
     const rows = getFilteredRowsForExport();
     const headers = [
-      "Codigo Cliente","Nombre Cliente","Distrito Catalogo","Distrito GeoJson",
-      "Frecuencia Actual","Frecuencia Prop Clie",
-      "Canal","Ruta","Latitud","Longitud","Oficina","Kg_Prom",
-      "Parte_Clie","Subparte_Clie","Eje_Subparte"
+      "Codigo Cliente",
+      "Nombre Cliente",
+      "Distrito Catalogo",
+      "Distrito GeoJson",
+      "Frecuencia Actual",
+      "Frecuencia Prop Clie",
+      "Canal",
+      "Interlocutor",
+      "Ruta",
+      "Latitud",
+      "Longitud",
+      "Oficina",
+      "Kg_Prom",
+      "Parte_Clie",
+      "Subparte_Clie"
     ];
 
 const csv = [
