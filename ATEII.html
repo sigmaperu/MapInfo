@@ -311,12 +311,12 @@
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
 
   const subpartPalette = {
-    A1: { color:"#0f172a", fillColor:"#2563eb", fillOpacity:0.38 },
-    A2: { color:"#0f172a", fillColor:"#8b5cf6", fillOpacity:0.38 },
-    B1: { color:"#0f172a", fillColor:"#f59e0b", fillOpacity:0.38 },
-    B2: { color:"#0f172a", fillColor:"#10b981", fillOpacity:0.38 },
-    C1: { color:"#0f172a", fillColor:"#f43f5e", fillOpacity:0.38 },
-    C2: { color:"#0f172a", fillColor:"#14b8a6", fillOpacity:0.38 }
+    A1: { color:"#0f172a", fillColor:"#2563eb", fillOpacity:0.40 },
+    A2: { color:"#0f172a", fillColor:"#7c3aed", fillOpacity:0.40 },
+    B1: { color:"#0f172a", fillColor:"#f59e0b", fillOpacity:0.40 },
+    B2: { color:"#0f172a", fillColor:"#84cc16", fillOpacity:0.40 },
+    C1: { color:"#0f172a", fillColor:"#f43f5e", fillOpacity:0.40 },
+    C2: { color:"#0f172a", fillColor:"#06b6d4", fillOpacity:0.40 }
   };
 
   let viewMode = "Actual";
@@ -353,7 +353,6 @@
   let featurePartByIdxClie = new Map();
   let featureSubpartByIdxClie = new Map();
   let kgByCode = new Map();
-  let adjacency = new Map();
   let districtStats = new Map();
   let channelPalette = {};
 
@@ -496,8 +495,6 @@
     const distShown = r.geoDistName || r.distrito || "—";
     const freqNow = r.freqLetters || "—";
     const freqProp = prop.proposedLetters || "—";
-    const kgStr = (r.kg && r.kg > 0) ? `${r.kg.toFixed(1)} kg prom.` : "Sin dato";
-    const lblProp = "Prop. Clie";
 
     return `
       <div style="min-width:285px; line-height:1.3;">
@@ -506,10 +503,10 @@
         <div class="popup-line"><strong>Canal:</strong> ${escapeHtml(r.canal || "")}</div>
         <div class="popup-line"><strong>Distrito:</strong> ${escapeHtml(distShown)}</div>
         <div class="popup-line"><strong>Oficina:</strong> ${escapeHtml(r.office || "")}</div>
-        <div class="popup-line"><strong>Kg promedio:</strong> ${kgStr}</div>
+        <div class="popup-line"><strong>Kg promedio:</strong> ${(r.kg || 0).toFixed(1)} kg prom.</div>
         <hr style="border:none;border-top:1px solid #1f2937; margin:6px 0;">
         <div class="popup-line"><strong>Frecuencia actual:</strong> <span class="freq">${freqNow}</span></div>
-        <div class="popup-line"><strong>${lblProp}:</strong> <span class="freq">${freqProp}</span> <span class="popup-muted">(${escapeHtml(proposedDaysStr)})</span></div>
+        <div class="popup-line"><strong>Prop. Clie:</strong> <span class="freq">${freqProp}</span> <span class="popup-muted">(${escapeHtml(proposedDaysStr)})</span></div>
         <div class="popup-line"><strong>Parte:</strong> ${prop.part ?? "—"} <span class="popup-muted">(${escapeHtml(partDays)})</span></div>
         <div class="popup-line"><strong>Subparte:</strong> ${prop.subpart ?? "—"}</div>
         <div class="popup-line"><strong>Ruta:</strong> ${escapeHtml(r.route || "")}</div>
@@ -628,7 +625,7 @@
       </div>
       <div style="margin:6px 0 4px; color:#9fb0c3;">Canales visibles (afectados por filtros)</div>
       ${channelItems || '<div class="row" style="color:#9fb0c3;">(Sin datos)</div>'}
-      <div style="margin:8px 0 4px; color:#9fb0c3;">Subparticiones</div>
+      <div style="margin:8px 0 4px; color:#9fb0c3;">Subparticiones norte / sur</div>
       ${subpartRows}
       <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por día (sin filtro de día)</div>
       <div class="row">
@@ -765,252 +762,85 @@
           name: normalize(r.geoDistName),
           label: r.geoDistName,
           kg: 0,
-          count: 0
+          count: 0,
+          cx: 0,
+          cy: 0
         });
       }
       const d = districtStats.get(r.featIdx);
       d.kg += (r.kg || 0);
       d.count += 1;
     }
-  }
 
-  function buildAdjacency(){
-    adjacency = new Map();
-    if (!areaFeatures?.features?.length) return;
-
-    const feats = areaFeatures.features;
-    for (let i=0; i<feats.length; i++) adjacency.set(i, new Set());
-
-    for (let i=0; i<feats.length; i++){
-      const fi = feats[i];
-      const bi = turf.bbox(fi);
-
-      for (let j=i+1; j<feats.length; j++){
-        const fj = feats[j];
-        const bj = turf.bbox(fj);
-
-        const bboxOverlap = !(bi[2] < bj[0] || bj[2] < bi[0] || bi[3] < bj[1] || bj[3] < bi[1]);
-        if (!bboxOverlap) continue;
-
-        let isAdj = false;
-        try { isAdj = turf.booleanTouches(fi, fj); } catch(e){}
-
-        if (isAdj){
-          adjacency.get(i).add(j);
-          adjacency.get(j).add(i);
-        }
+    districtStats.forEach((d, idx) => {
+      try{
+        const cent = turf.centroid(areaFeatures.features[idx]);
+        d.cx = cent.geometry.coordinates[0];
+        d.cy = cent.geometry.coordinates[1];
+      } catch(e){
+        d.cx = 0;
+        d.cy = 0;
       }
-    }
-  }
-
-  function getConnectedComponent(start, allowedSet){
-    const visited = new Set();
-    const stack = [start];
-    visited.add(start);
-
-    while (stack.length){
-      const cur = stack.pop();
-      const neigh = adjacency.get(cur) || new Set();
-      neigh.forEach(n => {
-        if (allowedSet.has(n) && !visited.has(n)){
-          visited.add(n);
-          stack.push(n);
-        }
-      });
-    }
-    return visited;
-  }
-
-  function isConnectedSubset(subset){
-    const arr = Array.from(subset);
-    if (arr.length <= 1) return true;
-    const reached = getConnectedComponent(arr[0], subset);
-    return reached.size === subset.size;
-  }
-
-  function subsetStats(subset){
-    let kg = 0, count = 0;
-    subset.forEach(idx => {
-      const d = districtStats.get(idx);
-      if (!d) return;
-      kg += d.kg || 0;
-      count += d.count || 0;
     });
-    return { kg, count };
   }
 
-  function pickSeedPair(nodes){
-    if (nodes.length <= 1) return [nodes[0], nodes[0]];
-
-    let bestPair = [nodes[0], nodes[nodes.length - 1]];
-    let bestScore = -Infinity;
-
-    for (let i = 0; i < nodes.length; i++){
-      for (let j = i + 1; j < nodes.length; j++){
-        const a = districtStats.get(nodes[i]);
-        const b = districtStats.get(nodes[j]);
-        if (!a || !b) continue;
-
-        const score = Math.abs((a.kg || 0) - (b.kg || 0)) + Math.abs((a.count || 0) - (b.count || 0)) * 2;
-        if (score > bestScore){
-          bestScore = score;
-          bestPair = [nodes[i], nodes[j]];
-        }
-      }
-    }
-    return bestPair;
-  }
-
-  function assignContiguousSubpartsForOneMainPart(partMap, mainPart){
+  function assignNorthSouthSubpartsForMainPart(partMap, mainPart){
     const nodes = [];
     districtStats.forEach((d, idx) => {
-      if (partMap.get(idx) === mainPart) nodes.push(idx);
+      if (partMap.get(idx) === mainPart){
+        nodes.push({ idx, kg: d.kg, count: d.count, cy: d.cy });
+      }
     });
 
-    const result = new Map();
-    if (nodes.length === 0) return result;
+    const out = new Map();
+    if (nodes.length === 0) return out;
     if (nodes.length === 1){
-      result.set(nodes[0], `${mainPart}1`);
-      return result;
+      out.set(nodes[0].idx, `${mainPart}1`);
+      return out;
     }
 
-    const fullSet = new Set(nodes);
-    const [seed1, seed2] = pickSeedPair(nodes);
+    nodes.sort((a,b) => b.cy - a.cy); // norte a sur
 
-    let group1 = new Set([seed1]);
-    let group2 = new Set([seed2]);
-    const assigned = new Set([seed1, seed2]);
-
-    function frontier(group, otherGroup){
-      const out = [];
-      group.forEach(idx => {
-        const neigh = adjacency.get(idx) || new Set();
-        neigh.forEach(n => {
-          if (!fullSet.has(n)) return;
-          if (assigned.has(n)) return;
-          if (otherGroup.has(n)) return;
-          out.push(n);
-        });
-      });
-      return Array.from(new Set(out));
+    let totalKg = 0, totalCt = 0;
+    for (const n of nodes){
+      totalKg += n.kg;
+      totalCt += n.count;
     }
 
-    while (assigned.size < nodes.length){
-      const f1 = frontier(group1, group2);
-      const f2 = frontier(group2, group1);
-      let candidates = [];
+    let bestCut = 1;
+    let accKg = 0, accCt = 0;
+    let bestScore = Infinity;
 
-      f1.forEach(idx => candidates.push({ idx, target: 1 }));
-      f2.forEach(idx => candidates.push({ idx, target: 2 }));
+    for (let cut = 1; cut < nodes.length; cut++){
+      accKg += nodes[cut - 1].kg;
+      accCt += nodes[cut - 1].count;
 
-      if (!candidates.length){
-        const leftovers = nodes.filter(n => !assigned.has(n));
-        leftovers.forEach(idx => {
-          const s1 = subsetStats(new Set([...group1, idx]));
-          const s2 = subsetStats(group2);
-          const score1 = Math.abs(s1.kg - s2.kg) + Math.abs(s1.count - s2.count) * 8;
+      const northKg = accKg;
+      const northCt = accCt;
+      const southKg = totalKg - northKg;
+      const southCt = totalCt - northCt;
 
-          const t1 = subsetStats(group1);
-          const t2 = subsetStats(new Set([...group2, idx]));
-          const score2 = Math.abs(t1.kg - t2.kg) + Math.abs(t1.count - t2.count) * 8;
+      const score =
+        Math.abs(northKg - southKg) +
+        Math.abs(northCt - southCt) * 8;
 
-          if (score1 <= score2) group1.add(idx);
-          else group2.add(idx);
-
-          assigned.add(idx);
-        });
-        break;
-      }
-
-      let best = null;
-
-      for (const cand of candidates){
-        const idx = cand.idx;
-        const test1 = new Set(group1);
-        const test2 = new Set(group2);
-
-        if (cand.target === 1) test1.add(idx);
-        else test2.add(idx);
-
-        const s1 = subsetStats(test1);
-        const s2 = subsetStats(test2);
-        const balanceScore = Math.abs(s1.kg - s2.kg) + Math.abs(s1.count - s2.count) * 8;
-
-        if (!best || balanceScore < best.score){
-          best = { idx, target: cand.target, score: balanceScore };
-        }
-      }
-
-      if (!best) break;
-
-      if (best.target === 1) group1.add(best.idx);
-      else group2.add(best.idx);
-
-      assigned.add(best.idx);
-    }
-
-    if (!isConnectedSubset(group1) || !isConnectedSubset(group2)){
-      group1 = new Set([seed1]);
-      group2 = new Set([seed2]);
-      assigned.clear();
-      assigned.add(seed1);
-      assigned.add(seed2);
-
-      while (assigned.size < nodes.length){
-        const pending = nodes.filter(n => !assigned.has(n));
-        let moved = false;
-
-        for (const idx of pending){
-          const neigh = adjacency.get(idx) || new Set();
-          const touches1 = Array.from(neigh).some(n => group1.has(n));
-          const touches2 = Array.from(neigh).some(n => group2.has(n));
-
-          if (!touches1 && !touches2) continue;
-
-          const s1 = subsetStats(new Set([...group1, idx]));
-          const s2 = subsetStats(group2);
-          const score1 = Math.abs(s1.kg - s2.kg) + Math.abs(s1.count - s2.count) * 8;
-
-          const t1 = subsetStats(group1);
-          const t2 = subsetStats(new Set([...group2, idx]));
-          const score2 = Math.abs(t1.kg - t2.kg) + Math.abs(t1.count - t2.count) * 8;
-
-          if (touches1 && (!touches2 || score1 <= score2)) group1.add(idx);
-          else group2.add(idx);
-
-          assigned.add(idx);
-          moved = true;
-        }
-
-        if (!moved){
-          pending.forEach(idx => {
-            const s1 = subsetStats(new Set([...group1, idx]));
-            const s2 = subsetStats(group2);
-            const score1 = Math.abs(s1.kg - s2.kg) + Math.abs(s1.count - s2.count) * 8;
-
-            const t1 = subsetStats(group1);
-            const t2 = subsetStats(new Set([...group2, idx]));
-            const score2 = Math.abs(t1.kg - t2.kg) + Math.abs(t1.count - t2.count) * 8;
-
-            if (score1 <= score2) group1.add(idx);
-            else group2.add(idx);
-
-            assigned.add(idx);
-          });
-        }
+      if (score < bestScore){
+        bestScore = score;
+        bestCut = cut;
       }
     }
 
-    group1.forEach(idx => result.set(idx, `${mainPart}1`));
-    group2.forEach(idx => result.set(idx, `${mainPart}2`));
+    for (let i=0; i<nodes.length; i++){
+      out.set(nodes[i].idx, i < bestCut ? `${mainPart}1` : `${mainPart}2`);
+    }
 
-    return result;
+    return out;
   }
 
   function assignBalancedSubpartsForMap(partMap){
     const out = new Map();
     ["A","B","C"].forEach(mainPart => {
-      const partial = assignContiguousSubpartsForOneMainPart(partMap, mainPart);
+      const partial = assignNorthSouthSubpartsForMainPart(partMap, mainPart);
       partial.forEach((sub, idx) => out.set(idx, sub));
     });
     return out;
@@ -1171,6 +1001,7 @@ function csvEscape(v) {
     ? `"${s.replace(/"/g, '""')}"`
     : s;
 }
+
   document.getElementById('exportBtn').addEventListener('click', ()=>{
     const rows = getFilteredRowsForExport();
     const headers = [
@@ -1180,7 +1011,7 @@ function csvEscape(v) {
       "Parte_Clie","Subparte_Clie"
     ];
 
-   const csv = [
+const csv = [
   headers.join(",")
 ].concat(
   rows.map(r =>
@@ -1207,7 +1038,6 @@ function csvEscape(v) {
       .join(",")
   )
 ).join("\n");
-
 
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
@@ -1276,7 +1106,6 @@ function csvEscape(v) {
       });
 
       boundaryLayer.addData(areaFeatures);
-      buildAdjacency();
 
       try{
         const b = boundaryLayer.getBounds();
