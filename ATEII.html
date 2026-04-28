@@ -206,12 +206,47 @@
  }
  .popup-line{ margin:3px 0; }
  .popup-muted{ color:#9CA3AF; }
+
+ .district-popup{
+  min-width:240px;
+  line-height:1.35;
+ }
+ .district-popup h4{
+  margin:0 0 8px 0;
+  font-size:14px;
+  font-weight:800;
+  color:#e6edf3;
+ }
+ .district-popup .stat{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  margin:4px 0;
+ }
+ .district-popup .k{
+  color:#9fb0c3;
+  font-weight:600;
+ }
+ .district-popup .v{
+  color:#f8fafc;
+  font-weight:800;
+ }
+
  .leaflet-tooltip{
   background:#101826;
   color:#dbe7f3;
   border:1px solid #223144;
   border-radius:10px;
   box-shadow:var(--elev);
+ }
+ .leaflet-popup-content-wrapper{
+  background:#0f1722;
+  color:#e5edf6;
+  border:1px solid #243245;
+  border-radius:12px;
+ }
+ .leaflet-popup-tip{
+  background:#0f1722;
  }
  .leaflet-control-container .leaflet-bottom.leaflet-right{
   right:16px;
@@ -519,6 +554,51 @@
     `;
   }
 
+  function getDistrictSummary(idx){
+    const feat = areaFeatures.features[idx];
+    const districtName = getFeatureDistName(feat);
+
+    let clients = 0;
+    let kgTotal = 0;
+    let part = null;
+    let subpart = null;
+
+    for (const r of records){
+      if (r.featIdx !== idx) continue;
+      if (!isValidOffice(r.office)) continue;
+      if (selectedCanal !== "Todos" && normalize(r.canal) !== normalize(selectedCanal)) continue;
+      if (!passesZ3(r)) continue;
+
+      clients++;
+      kgTotal += (r.kg || 0);
+
+      if (viewMode === "PropClie"){
+        part = r.partClie || part;
+        subpart = r.subpartClie || subpart;
+      }
+    }
+
+    const kgAvg = clients > 0 ? kgTotal / clients : 0;
+    return { districtName, clients, kgTotal, kgAvg, part, subpart };
+  }
+
+  function buildDistrictPopup(idx){
+    const s = getDistrictSummary(idx);
+    const axisTxt = s.part ? (splitAxisByPart[s.part] === 'EW' ? 'Este/Oeste' : 'Norte/Sur') : '—';
+
+    return `
+      <div class="district-popup">
+        <h4>${escapeHtml(s.districtName)}</h4>
+        <div class="stat"><span class="k">Clientes</span><span class="v">${s.clients}</span></div>
+        <div class="stat"><span class="k">Kg totales</span><span class="v">${s.kgTotal.toFixed(1)}</span></div>
+        <div class="stat"><span class="k">Kg promedio</span><span class="v">${s.kgAvg.toFixed(1)}</span></div>
+        ${viewMode === "PropClie" ? `<div class="stat"><span class="k">Parte</span><span class="v">${escapeHtml(s.part || "—")}</span></div>` : ``}
+        ${viewMode === "PropClie" ? `<div class="stat"><span class="k">Subparte</span><span class="v">${escapeHtml(s.subpart || "—")}</span></div>` : ``}
+        ${viewMode === "PropClie" ? `<div class="stat"><span class="k">Eje</span><span class="v">${escapeHtml(axisTxt)}</span></div>` : ``}
+      </div>
+    `;
+  }
+
   function channelSummaryWithFilters(){
     const out = {};
     for (const r of records){
@@ -689,13 +769,31 @@
         return { color:'#ef4444', weight:1, fillOpacity:0 };
       },
       onEachFeature: (feature, polygonLayer) => {
+        const idx = feature.properties.__idx;
         const name = getFeatureDistName(feature);
+
         polygonLayer.bindTooltip(name, {
           direction:'auto',
           opacity:0.95,
           sticky:true,
           className:'district-tip',
           permanent:false
+        });
+
+        polygonLayer.on('mouseover', function(){
+          this.setStyle({ weight: 4, opacity: 1, fillOpacity: 0.55 });
+        });
+
+        polygonLayer.on('mouseout', function(){
+          renderDistrictsColoredByPart();
+        });
+
+        polygonLayer.on('click', function(e){
+          const html = buildDistrictPopup(idx);
+          L.popup({ maxWidth: 320 })
+            .setLatLng(e.latlng)
+            .setContent(html)
+            .openOn(map);
         });
       }
     });
@@ -865,7 +963,6 @@
       'EW'
     );
 
-    // preferimos el eje con mejor score; si están muy cerca, elegimos el que tenga mayor separación geométrica
     let chosen = nsEval;
     if (ewEval.score < nsEval.score * 0.97) chosen = ewEval;
     else if (Math.abs(ewEval.score - nsEval.score) <= Math.max(5, nsEval.score * 0.03)){
@@ -878,11 +975,7 @@
 
     for (let i=0; i<chosen.ordered.length; i++){
       const idx = chosen.ordered[i].idx;
-      if (chosen.axis === 'NS'){
-        out.set(idx, i < chosen.cut ? `${mainPart}1` : `${mainPart}2`);
-      } else {
-        out.set(idx, i < chosen.cut ? `${mainPart}1` : `${mainPart}2`);
-      }
+      out.set(idx, i < chosen.cut ? `${mainPart}1` : `${mainPart}2`);
     }
 
     return { out, axis: chosen.axis };
@@ -1092,6 +1185,7 @@ const csv = [
       .join(",")
   )
 ).join("\n");
+
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
