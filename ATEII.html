@@ -176,7 +176,7 @@
   border-radius:12px;
   padding:10px;
   font-size:12px;
-  max-width:620px;
+  max-width:390px;
   box-shadow:var(--elev);
   backdrop-filter: blur(8px);
  }
@@ -192,6 +192,34 @@
   gap:6px;
   margin:4px 0;
   flex-wrap:wrap;
+ }
+
+ .legend .day-col{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  margin-top:6px;
+ }
+
+ .legend .day-line{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:2px 0;
+ }
+
+ .legend .day-left{
+  min-width:20px;
+  font-weight:700;
+  color:#e5edf6;
+ }
+
+ .legend .day-right{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
  }
 
  .swatch{
@@ -399,26 +427,29 @@
 
   map.createPane('zonesPane');
   map.getPane('zonesPane').style.zIndex = 450;
+  map.getPane('zonesPane').style.pointerEvents = 'none';
 
   map.createPane('districtPane');
-  map.getPane('districtPane').style.zIndex = 500;
+  map.getPane('districtPane').style.zIndex = 620;
+  map.getPane('districtPane').style.pointerEvents = 'auto';
 
   map.createPane('markersPane');
   map.getPane('markersPane').style.zIndex = 650;
+  map.getPane('markersPane').style.pointerEvents = 'auto';
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution:'© OpenStreetMap'
   }).addTo(map);
 
-  const currentLayer = L.layerGroup([], { pane:'markersPane' }).addTo(map);
-  const proposedLayer = L.layerGroup([], { pane:'markersPane' });
+  const currentLayer = L.layerGroup().addTo(map);
+  const proposedLayer = L.layerGroup();
   const boundaryLayer = L.geoJSON(null, {
     pane:'zonesPane',
     interactive:false,
     style: { color:'#ef4444', weight:1, fill:false }
   }).addTo(map);
 
-  const districtsLayerHolder = L.layerGroup().addTo(map);
+  let districtLayer = null;
 
   let areaFeatures = null;
   let records = [];
@@ -428,7 +459,7 @@
   let districtStats = new Map();
   let channelPalette = {};
   let splitAxisByPart = { A:'NS', B:'NS', C:'NS' };
-  let districtGeoJsonLayer = null;
+  let selectedDistrictLayer = null;
 
   function normalize(s){
     return (s ?? "")
@@ -751,13 +782,13 @@
       <div style="margin:8px 0 4px; color:#9fb0c3;">Subparticiones automáticas por eje</div>
       ${subpartRows}
       <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por día (sin filtro de día)</div>
-      <div class="row">
-        L: <span class="pill">${daySummary.L.count}</span> <span class="pill">${daySummary.L.kg.toFixed(0)} kg</span>
-        M: <span class="pill">${daySummary.M.count}</span> <span class="pill">${daySummary.M.kg.toFixed(0)} kg</span>
-        X: <span class="pill">${daySummary.X.count}</span> <span class="pill">${daySummary.X.kg.toFixed(0)} kg</span>
-        J: <span class="pill">${daySummary.J.count}</span> <span class="pill">${daySummary.J.kg.toFixed(0)} kg</span>
-        V: <span class="pill">${daySummary.V.count}</span> <span class="pill">${daySummary.V.kg.toFixed(0)} kg</span>
-        S: <span class="pill">${daySummary.S.count}</span> <span class="pill">${daySummary.S.kg.toFixed(0)} kg</span>
+      <div class="day-col">
+        <div class="day-line"><span class="day-left">L</span><span class="day-right"><span class="pill">${daySummary.L.count} clientes</span><span class="pill">${daySummary.L.kg.toFixed(0)} kg</span></span></div>
+        <div class="day-line"><span class="day-left">M</span><span class="day-right"><span class="pill">${daySummary.M.count} clientes</span><span class="pill">${daySummary.M.kg.toFixed(0)} kg</span></span></div>
+        <div class="day-line"><span class="day-left">X</span><span class="day-right"><span class="pill">${daySummary.X.count} clientes</span><span class="pill">${daySummary.X.kg.toFixed(0)} kg</span></span></div>
+        <div class="day-line"><span class="day-left">J</span><span class="day-right"><span class="pill">${daySummary.J.count} clientes</span><span class="pill">${daySummary.J.kg.toFixed(0)} kg</span></span></div>
+        <div class="day-line"><span class="day-left">V</span><span class="day-right"><span class="pill">${daySummary.V.count} clientes</span><span class="pill">${daySummary.V.kg.toFixed(0)} kg</span></span></div>
+        <div class="day-line"><span class="day-left">S</span><span class="day-right"><span class="pill">${daySummary.S.count} clientes</span><span class="pill">${daySummary.S.kg.toFixed(0)} kg</span></span></div>
       </div>
     `;
   }
@@ -768,7 +799,7 @@
     if (map.hasLayer(currentLayer)) layers.push(currentLayer);
     if (map.hasLayer(proposedLayer)) layers.push(proposedLayer);
     if (map.hasLayer(boundaryLayer)) layers.push(boundaryLayer);
-    if (map.hasLayer(districtsLayerHolder)) layers.push(districtsLayerHolder);
+    if (districtLayer) layers.push(districtLayer);
 
     for (const l of layers){
       const b = l.getBounds?.();
@@ -791,28 +822,32 @@
         weight: 2.8,
         opacity: 1,
         fillColor: st.fillColor,
-        fillOpacity: st.fillOpacity
+        fillOpacity: st.fillOpacity,
+        interactive: true
       };
     }
+
     return {
       pane:'districtPane',
       color:'#ef4444',
       weight:1.3,
       opacity:1,
       fillColor:'#ef4444',
-      fillOpacity:0.03
+      fillOpacity:0.04,
+      interactive: true
     };
   }
 
-  function highlightDistrict(layer, idx){
+  function highlightDistrict(layer, idx, sticky=false){
     const style = baseDistrictStyle(idx);
     layer.setStyle({
       color: style.color,
-      weight: Math.max(style.weight + 1.4, 4),
+      weight: Math.max(style.weight + 1.2, 4),
       opacity: 1,
       fillColor: style.fillColor,
       fillOpacity: Math.min((style.fillOpacity || 0.12) + 0.14, 0.68)
     });
+    if (sticky) selectedDistrictLayer = layer;
     if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) layer.bringToFront();
   }
 
@@ -820,9 +855,21 @@
     layer.setStyle(baseDistrictStyle(idx));
   }
 
-  function renderDistrictsColoredByPart(){
-    districtsLayerHolder.clearLayers();
-    districtGeoJsonLayer = null;
+  function clearSelectedDistrict(){
+    if (selectedDistrictLayer && districtLayer){
+      const idx = selectedDistrictLayer.feature?.properties?.__idx;
+      if (idx !== undefined) resetDistrictStyle(selectedDistrictLayer, idx);
+    }
+    selectedDistrictLayer = null;
+  }
+
+  function renderDistrictLayer(){
+    if (districtLayer) {
+      map.removeLayer(districtLayer);
+      districtLayer = null;
+    }
+    clearSelectedDistrict();
+
     if (!areaFeatures) return;
 
     areaFeatures.features.forEach((f, i) => {
@@ -830,9 +877,10 @@
       f.properties.__idx = i;
     });
 
-    districtGeoJsonLayer = L.geoJSON(areaFeatures, {
+    districtLayer = L.geoJSON(areaFeatures, {
       pane:'districtPane',
       interactive:true,
+      bubblingMouseEvents:false,
       style: (feature) => {
         const idx = feature.properties.__idx;
         return baseDistrictStyle(idx);
@@ -846,31 +894,38 @@
           opacity:0.95,
           sticky:true,
           className:'district-tip',
-          permanent:false,
-          pane:'popupPane'
+          permanent:false
         });
 
         layer.on('mouseover', function(){
-          highlightDistrict(layer, idx);
+          if (selectedDistrictLayer !== layer) highlightDistrict(layer, idx, false);
         });
 
         layer.on('mouseout', function(){
-          resetDistrictStyle(layer, idx);
+          if (selectedDistrictLayer !== layer) resetDistrictStyle(layer, idx);
         });
 
         layer.on('click', function(e){
+          L.DomEvent.stopPropagation(e);
+          clearSelectedDistrict();
+          highlightDistrict(layer, idx, true);
+          layer.openTooltip(e.latlng);
           const html = buildDistrictPopup(idx);
-          highlightDistrict(layer, idx);
-          L.popup({ maxWidth: 320, autoPan:true })
-            .setLatLng(e.latlng)
-            .setContent(html)
-            .openOn(map);
+          layer.bindPopup(html, { maxWidth:320, autoPan:true }).openPopup(e.latlng);
         });
       }
     });
 
-    districtsLayerHolder.addLayer(districtGeoJsonLayer);
+    districtLayer.addTo(map);
   }
+
+  map.on('click', function(){
+    if (selectedDistrictLayer){
+      const idx = selectedDistrictLayer.feature?.properties?.__idx;
+      if (idx !== undefined) resetDistrictStyle(selectedDistrictLayer, idx);
+      selectedDistrictLayer = null;
+    }
+  });
 
   function refreshLayers(){
     currentLayer.clearLayers();
@@ -913,7 +968,7 @@
       if (map.hasLayer(currentLayer)) map.removeLayer(currentLayer);
     }
 
-    renderDistrictsColoredByPart();
+    renderDistrictLayer();
     renderLegend();
     fitToContent();
   }
@@ -1228,26 +1283,24 @@ function csvEscape(v) {
     ? `"${s.replace(/"/g, '""')}"`
     : s;
 }
-
-  // Orden corregido:
-  // [0] Codigo Cliente
-  // [1] Nombre Cliente
-  // [2] Distrito Catalogo
-  // [3] Distrito GeoJson
-  // [4] Frecuencia Actual
-  // [5] Frecuencia Prop Clie
-  // [6] Canal
-  // [7] Interlocutor
-  // [8] Ruta
-  // [9] Latitud
-  // [10] Longitud
-  // [11] Oficina
-  // [12] Kg_Prom
-  // [13] Parte_Clie
-  // Eliminada la columna [14] anterior; no se exporta Eje_Subparte
-  // [14] Subparte_Clie
   document.getElementById('exportBtn').addEventListener('click', ()=>{
     const rows = getFilteredRowsForExport();
+
+    // [0] Codigo Cliente
+    // [1] Nombre Cliente
+    // [2] Distrito Catalogo
+    // [3] Distrito GeoJson
+    // [4] Frecuencia Actual
+    // [5] Frecuencia Prop Clie
+    // [6] Canal
+    // [7] Interlocutor
+    // [8] Ruta
+    // [9] Latitud
+    // [10] Longitud
+    // [11] Oficina
+    // [12] Kg_Prom
+    // [13] Parte_Clie
+    // [14] Subparte_Clie
     const headers = [
       "Codigo Cliente",
       "Nombre Cliente",
