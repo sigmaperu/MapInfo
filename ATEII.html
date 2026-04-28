@@ -159,7 +159,7 @@
   border-radius:12px;
   padding:10px;
   font-size:12px;
-  max-width:560px;
+  max-width:620px;
   box-shadow:var(--elev);
   backdrop-filter: blur(8px);
  }
@@ -311,12 +311,12 @@
   const partToFreqLetters = { "A":"LJ", "B":"MV", "C":"XS" };
 
   const subpartPalette = {
-    A1: { color:"#0f172a", fillColor:"#2563eb", fillOpacity:0.40 },
-    A2: { color:"#0f172a", fillColor:"#7c3aed", fillOpacity:0.40 },
-    B1: { color:"#0f172a", fillColor:"#f59e0b", fillOpacity:0.40 },
-    B2: { color:"#0f172a", fillColor:"#84cc16", fillOpacity:0.40 },
-    C1: { color:"#0f172a", fillColor:"#f43f5e", fillOpacity:0.40 },
-    C2: { color:"#0f172a", fillColor:"#06b6d4", fillOpacity:0.40 }
+    A1: { color:"#0f172a", fillColor:"#2563eb", fillOpacity:0.42 },
+    A2: { color:"#0f172a", fillColor:"#7c3aed", fillOpacity:0.42 },
+    B1: { color:"#0f172a", fillColor:"#f59e0b", fillOpacity:0.42 },
+    B2: { color:"#0f172a", fillColor:"#84cc16", fillOpacity:0.42 },
+    C1: { color:"#0f172a", fillColor:"#f43f5e", fillOpacity:0.42 },
+    C2: { color:"#0f172a", fillColor:"#06b6d4", fillOpacity:0.42 }
   };
 
   let viewMode = "Actual";
@@ -355,6 +355,7 @@
   let kgByCode = new Map();
   let districtStats = new Map();
   let channelPalette = {};
+  let splitAxisByPart = { A:'NS', B:'NS', C:'NS' };
 
   function normalize(s){
     return (s ?? "")
@@ -495,9 +496,10 @@
     const distShown = r.geoDistName || r.distrito || "—";
     const freqNow = r.freqLetters || "—";
     const freqProp = prop.proposedLetters || "—";
+    const axisTxt = prop.part ? (splitAxisByPart[prop.part] === 'EW' ? 'Este/Oeste' : 'Norte/Sur') : '—';
 
     return `
-      <div style="min-width:285px; line-height:1.3;">
+      <div style="min-width:300px; line-height:1.3;">
         <div class="popup-line" style="font-weight:800; font-size:14px;">Cliente: ${escapeHtml(r.code)}</div>
         <div class="popup-line"><strong>Nombre:</strong> ${escapeHtml(r.name || "")}</div>
         <div class="popup-line"><strong>Canal:</strong> ${escapeHtml(r.canal || "")}</div>
@@ -508,7 +510,7 @@
         <div class="popup-line"><strong>Frecuencia actual:</strong> <span class="freq">${freqNow}</span></div>
         <div class="popup-line"><strong>Prop. Clie:</strong> <span class="freq">${freqProp}</span> <span class="popup-muted">(${escapeHtml(proposedDaysStr)})</span></div>
         <div class="popup-line"><strong>Parte:</strong> ${prop.part ?? "—"} <span class="popup-muted">(${escapeHtml(partDays)})</span></div>
-        <div class="popup-line"><strong>Subparte:</strong> ${prop.subpart ?? "—"}</div>
+        <div class="popup-line"><strong>Subparte:</strong> ${prop.subpart ?? "—"} <span class="popup-muted">(${axisTxt})</span></div>
         <div class="popup-line"><strong>Ruta:</strong> ${escapeHtml(r.route || "")}</div>
         <div class="popup-line" style="margin-top:6px;">
           <a href="${gm}" target="_blank" rel="noopener noreferrer">Abrir en Google Maps ↗</a>
@@ -609,9 +611,11 @@
 
     const subpartRows = ["A1","A2","B1","B2","C1","C2"].map(sp => {
       const st = getSubpartStyle(sp);
+      const axis = splitAxisByPart[sp[0]] === 'EW' ? (sp.endsWith('1') ? 'Oeste' : 'Este') : (sp.endsWith('1') ? 'Norte' : 'Sur');
       return `<div class="row">
         <span class="swatch" style="background:${st.fillColor}; border-color:${st.color}"></span>
         <strong>${sp}</strong>
+        <span class="pill">${axis}</span>
         <span class="pill">${subSummary[sp].count} clientes</span>
         <span class="pill">${subSummary[sp].kg.toFixed(0)} kg</span>
       </div>`;
@@ -625,7 +629,7 @@
       </div>
       <div style="margin:6px 0 4px; color:#9fb0c3;">Canales visibles (afectados por filtros)</div>
       ${channelItems || '<div class="row" style="color:#9fb0c3;">(Sin datos)</div>'}
-      <div style="margin:8px 0 4px; color:#9fb0c3;">Subparticiones norte / sur</div>
+      <div style="margin:8px 0 4px; color:#9fb0c3;">Subparticiones automáticas por eje</div>
       ${subpartRows}
       <div style="margin:8px 0 4px; color:#9fb0c3;">Resumen por día (sin filtro de día)</div>
       <div class="row">
@@ -774,55 +778,50 @@
 
     districtStats.forEach((d, idx) => {
       try{
-        const cent = turf.centroid(areaFeatures.features[idx]);
-        d.cx = cent.geometry.coordinates[0];
-        d.cy = cent.geometry.coordinates[1];
+        const center = turf.centerOfMass
+          ? turf.centerOfMass(areaFeatures.features[idx])
+          : turf.centroid(areaFeatures.features[idx]);
+        d.cx = center.geometry.coordinates[0];
+        d.cy = center.geometry.coordinates[1];
       } catch(e){
-        d.cx = 0;
-        d.cy = 0;
+        try{
+          const cent = turf.centroid(areaFeatures.features[idx]);
+          d.cx = cent.geometry.coordinates[0];
+          d.cy = cent.geometry.coordinates[1];
+        } catch(e2){
+          d.cx = 0;
+          d.cy = 0;
+        }
       }
     });
   }
 
-  function assignNorthSouthSubpartsForMainPart(partMap, mainPart){
-    const nodes = [];
-    districtStats.forEach((d, idx) => {
-      if (partMap.get(idx) === mainPart){
-        nodes.push({ idx, kg: d.kg, count: d.count, cy: d.cy });
-      }
-    });
-
-    const out = new Map();
-    if (nodes.length === 0) return out;
-    if (nodes.length === 1){
-      out.set(nodes[0].idx, `${mainPart}1`);
-      return out;
+  function evaluateAxisCut(nodes, axis){
+    const arr = [...nodes].sort((a,b) => axis === 'NS' ? (b.coord - a.coord) : (a.coord - b.coord));
+    if (arr.length <= 1){
+      return { axis, cut:1, score:0, ordered:arr };
     }
-
-    nodes.sort((a,b) => b.cy - a.cy); // norte a sur
 
     let totalKg = 0, totalCt = 0;
-    for (const n of nodes){
+    arr.forEach(n => {
       totalKg += n.kg;
       totalCt += n.count;
-    }
+    });
 
     let bestCut = 1;
-    let accKg = 0, accCt = 0;
     let bestScore = Infinity;
+    let accKg = 0, accCt = 0;
 
-    for (let cut = 1; cut < nodes.length; cut++){
-      accKg += nodes[cut - 1].kg;
-      accCt += nodes[cut - 1].count;
+    for (let cut = 1; cut < arr.length; cut++){
+      accKg += arr[cut - 1].kg;
+      accCt += arr[cut - 1].count;
 
-      const northKg = accKg;
-      const northCt = accCt;
-      const southKg = totalKg - northKg;
-      const southCt = totalCt - northCt;
+      const leftKg = accKg;
+      const leftCt = accCt;
+      const rightKg = totalKg - leftKg;
+      const rightCt = totalCt - leftCt;
 
-      const score =
-        Math.abs(northKg - southKg) +
-        Math.abs(northCt - southCt) * 8;
+      const score = Math.abs(leftKg - rightKg) + Math.abs(leftCt - rightCt) * 8;
 
       if (score < bestScore){
         bestScore = score;
@@ -830,19 +829,74 @@
       }
     }
 
-    for (let i=0; i<nodes.length; i++){
-      out.set(nodes[i].idx, i < bestCut ? `${mainPart}1` : `${mainPart}2`);
+    return { axis, cut:bestCut, score:bestScore, ordered:arr };
+  }
+
+  function assignAxisSplitForMainPart(partMap, mainPart){
+    const nodes = [];
+    districtStats.forEach((d, idx) => {
+      if (partMap.get(idx) === mainPart){
+        nodes.push({
+          idx,
+          kg: d.kg,
+          count: d.count,
+          x: d.cx,
+          y: d.cy,
+          coordNS: d.cy,
+          coordEW: d.cx
+        });
+      }
+    });
+
+    const out = new Map();
+    if (nodes.length === 0) return { out, axis:'NS' };
+    if (nodes.length === 1){
+      out.set(nodes[0].idx, `${mainPart}1`);
+      return { out, axis:'NS' };
     }
 
-    return out;
+    const nsEval = evaluateAxisCut(
+      nodes.map(n => ({ idx:n.idx, kg:n.kg, count:n.count, coord:n.coordNS })),
+      'NS'
+    );
+
+    const ewEval = evaluateAxisCut(
+      nodes.map(n => ({ idx:n.idx, kg:n.kg, count:n.count, coord:n.coordEW })),
+      'EW'
+    );
+
+    // preferimos el eje con mejor score; si están muy cerca, elegimos el que tenga mayor separación geométrica
+    let chosen = nsEval;
+    if (ewEval.score < nsEval.score * 0.97) chosen = ewEval;
+    else if (Math.abs(ewEval.score - nsEval.score) <= Math.max(5, nsEval.score * 0.03)){
+      const nsSpread = Math.abs(nsEval.ordered[0].coord - nsEval.ordered[nsEval.ordered.length - 1].coord);
+      const ewSpread = Math.abs(ewEval.ordered[0].coord - ewEval.ordered[ewEval.ordered.length - 1].coord);
+      chosen = ewSpread > nsSpread ? ewEval : nsEval;
+    }
+
+    splitAxisByPart[mainPart] = chosen.axis;
+
+    for (let i=0; i<chosen.ordered.length; i++){
+      const idx = chosen.ordered[i].idx;
+      if (chosen.axis === 'NS'){
+        out.set(idx, i < chosen.cut ? `${mainPart}1` : `${mainPart}2`);
+      } else {
+        out.set(idx, i < chosen.cut ? `${mainPart}1` : `${mainPart}2`);
+      }
+    }
+
+    return { out, axis: chosen.axis };
   }
 
   function assignBalancedSubpartsForMap(partMap){
     const out = new Map();
+    splitAxisByPart = { A:'NS', B:'NS', C:'NS' };
+
     ["A","B","C"].forEach(mainPart => {
-      const partial = assignNorthSouthSubpartsForMainPart(partMap, mainPart);
-      partial.forEach((sub, idx) => out.set(idx, sub));
+      const partial = assignAxisSplitForMainPart(partMap, mainPart);
+      partial.out.forEach((sub, idx) => out.set(idx, sub));
     });
+
     return out;
   }
 
@@ -1008,7 +1062,7 @@ function csvEscape(v) {
       "Codigo Cliente","Nombre Cliente","Distrito Catalogo","Distrito GeoJson",
       "Frecuencia Actual","Frecuencia Prop Clie",
       "Canal","Ruta","Latitud","Longitud","Oficina","Kg_Prom",
-      "Parte_Clie","Subparte_Clie"
+      "Parte_Clie","Subparte_Clie","Eje_Subparte"
     ];
 
 const csv = [
@@ -1038,7 +1092,6 @@ const csv = [
       .join(",")
   )
 ).join("\n");
-
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
