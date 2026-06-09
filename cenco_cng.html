@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <title>CENCOSUD - Verificación Coordenadas</title>
 
-https://unpkg.com/leaflet/dist/leaflet.css
-https://unpkg.com/leaflet/dist/leaflet.jsscript>
+<!-- ✅ Leaflet OK -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
   html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
   #map { height:100%; }
 
-  /* Panel */
   .panel {
     position:absolute;
     top:15px;
@@ -29,13 +29,12 @@ https://unpkg.com/leaflet/dist/leaflet.jsscript>
     font-size:14px;
   }
 
-  /* Items filtro */
   .item {
     display:flex;
     align-items:center;
     margin-bottom:6px;
-    cursor:pointer;
     font-size:13px;
+    cursor:pointer;
   }
 
   .item input {
@@ -55,7 +54,6 @@ https://unpkg.com/leaflet/dist/leaflet.jsscript>
     border-radius:4px;
     padding-left:4px;
   }
-
 </style>
 </head>
 
@@ -70,37 +68,32 @@ https://unpkg.com/leaflet/dist/leaflet.jsscript>
 
 <script>
 
-// ========================
 const URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/CENCOSUD.csv";
 
-// ========================
 const map = L.map('map').setView([-12.05, -77.04], 11);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19
 }).addTo(map);
 
-// ========================
 let markers = [];
 let dataGlobal = [];
 let activeRoutes = new Set();
 let colorMap = {};
 
-// colores
 const colors = [
   "#e74c3c","#3498db","#2ecc71","#f39c12",
   "#9b59b6","#16a085","#2c3e50","#e84393"
 ];
 
-// ========================
-// ICONO
+// ICONO tipo Google
 function createIcon(color) {
   return L.divIcon({
     className: '',
     html: `
       <svg width="22" height="34" viewBox="0 0 24 36">
         <path d="M12 0C5 0 0 6 0 13c0 10 12 23 12 23s12-13 12-23C24 6 19 0 12 0z"
-              fill="${color}" stroke="black" stroke-width="1"/>
+              fill="${color}" stroke="black"/>
         <circle cx="12" cy="13" r="5" fill="white"/>
       </svg>
     `,
@@ -109,7 +102,6 @@ function createIcon(color) {
   });
 }
 
-// ========================
 // LOAD CSV
 fetch(URL)
   .then(r => r.text())
@@ -118,31 +110,30 @@ fetch(URL)
     let rows = text.split("\n").map(r => r.split(","));
     rows.shift();
 
-    // quitar registros sin ruta
+    // ✅ eliminar sin ruta
     rows = rows.filter(r => r[8] && r[8].trim() !== "");
 
     dataGlobal = rows;
 
-    let rutasUnicas = [...new Set(rows.map(r => r[8]))];
+    let rutas = [...new Set(rows.map(r => r[8]))];
 
-    // 🔥 ORDENAR DIA 1, DIA 2...
-    rutasUnicas.sort((a,b) => {
+    // ✅ ordenar DIA 1, DIA 2...
+    rutas.sort((a,b) => {
       let na = parseInt(a.replace(/\D/g,'')) || 0;
       let nb = parseInt(b.replace(/\D/g,'')) || 0;
       return na - nb;
     });
 
-    rutasUnicas.forEach((ruta, i) => {
+    rutas.forEach((ruta,i)=>{
       colorMap[ruta] = colors[i % colors.length];
       activeRoutes.add(ruta);
     });
 
-    crearFiltros(rutasUnicas);
+    crearFiltros(rutas);
     render();
   });
 
-// ========================
-// FILTROS (BONITOS)
+// FILTROS
 function crearFiltros(rutas){
 
   const div = document.getElementById("filters");
@@ -177,7 +168,6 @@ function crearFiltros(rutas){
   });
 }
 
-// ========================
 // RENDER
 function render(){
 
