@@ -4,18 +4,17 @@
 <meta charset="UTF-8">
 <title>CENCOSUD - Verificación Coordenadas</title>
 
-<!-- ✅ ESTO ES LO QUE TE FALTABA -->
-https://unpkg.com/leaflet/dist/leaflet.css
-https://unpkg.com/leaflet/dist/leaflet.js
+<!-- ✅ IMPORTS REALES -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
+html, body { margin:0; padding:0; height:100%; font-family:Segoe UI; }
 #map { height:100%; }
 
 .panel {
   position:absolute;
-  top:15px;
-  left:15px;
+  top:15px; left:15px;
   z-index:1000;
   background:white;
   padding:15px;
@@ -26,34 +25,30 @@ html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
   overflow:auto;
 }
 
-.item { margin-bottom:8px; border-bottom:1px solid #eee; }
+.item { border-bottom:1px solid #eee; margin-bottom:6px; }
 
 .item-header {
-  display:flex;
-  align-items:center;
-  cursor:pointer;
-  font-size:13px;
+  display:flex; align-items:center;
+  cursor:pointer; font-size:13px;
 }
 
-.arrow { margin-right:6px; transition:0.2s; }
+.arrow { margin-right:6px; transition:.2s; }
 .arrow.open { transform:rotate(180deg); }
 
 .color-box {
   width:12px; height:12px;
-  border-radius:3px;
-  margin:0 6px;
+  border-radius:3px; margin:0 6px;
 }
 
 .tiendas {
   margin-left:20px;
-  margin-top:5px;
-  font-size:12px;
   display:none;
+  font-size:12px;
 }
 
 .tiendas div {
-  padding:3px 0;
   cursor:pointer;
+  padding:3px 0;
 }
 
 .tiendas div:hover { background:#f3f3f3; }
@@ -63,48 +58,42 @@ html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
 <body>
 
 <div id="map"></div>
+
 <div class="panel">
-  <b>Filtro Ruta</b>
-  <div id="filters"></div>
+<b>Filtro Ruta</b>
+<div id="filters"></div>
 </div>
 
 <script>
 
 const URL="https://raw.githubusercontent.com/sigmaperu/MapInfo/main/CENCOSUD.csv";
 
-// MAPA
 const map=L.map('map').setView([-12.05,-77.04],11);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// VARIABLES
 let markers=[], markerMap={}, dataGlobal=[];
-let activeRoutes=new Set(), colorMap={};
-let activeMarker=null, timer=null;
+let activeRoutes=new Set(), colorMap={}, activeMarker=null, timer=null;
 
 const colors=[
  "#e74c3c","#3498db","#2ecc71","#f39c12",
  "#9b59b6","#16a085","#2c3e50","#e84393"
 ];
 
-// ICONO
 function icon(color,size=22){
-  return L.divIcon({
-    html:`<svg width="${size}" height="${size*1.5}" viewBox="0 0 24 36">
-    <path d="M12 0C5 0 0 6 0 13c0 10 12 23 12 23s12-13 12-23C24 6 19 0 12 0z"
-    fill="${color}" stroke="black"/>
-    <circle cx="12" cy="13" r="5" fill="white"/>
-    </svg>`,
-    className:'',
-    iconSize:[size,size*1.5],
-    iconAnchor:[size/2,size*1.5]
-  });
+ return L.divIcon({
+  html:`<svg width="${size}" height="${size*1.5}" viewBox="0 0 24 36">
+  <path d="M12 0C5 0 0 6 0 13c0 10 12 23 12 23s12-13 12-23C24 6 19 0 12 0z"
+  fill="${color}" stroke="black"/>
+  <circle cx="12" cy="13" r="5" fill="white"/>
+  </svg>`,
+  className:'',
+  iconSize:[size,size*1.5],
+  iconAnchor:[size/2,size*1.5]
+ });
 }
 
-// LOAD
-fetch(URL)
-.then(r=>r.text())
-.then(text=>{
+fetch(URL).then(r=>r.text()).then(text=>{
 
  let rows=text.split("\n").map(r=>r.split(","));
  rows.shift();
@@ -114,47 +103,46 @@ fetch(URL)
  let rutas=[...new Set(dataGlobal.map(r=>r[8]))];
 
  rutas.sort((a,b)=>
-   (parseInt(a.replace(/\D/g,''))||0) -
-   (parseInt(b.replace(/\D/g,''))||0)
+  (parseInt(a.replace(/\D/g,''))||0) -
+  (parseInt(b.replace(/\D/g,''))||0)
  );
 
  rutas.forEach((ruta,i)=>{
-   colorMap[ruta]=colors[i%colors.length];
-   activeRoutes.add(ruta);
+  colorMap[ruta]=colors[i%colors.length];
+  activeRoutes.add(ruta);
  });
 
  filtros(rutas);
  render();
 });
 
-// HIGHLIGHT
 function highlight(tienda){
-  let m=markerMap[tienda];
-  if(!m) return;
 
-  clearTimeout(timer);
+ let m=markerMap[tienda];
+ if(!m) return;
 
-  if(activeMarker && activeMarker!==m){
-    activeMarker.setIcon(icon(activeMarker.color,22));
-  }
+ clearTimeout(timer);
 
-  m.setIcon(icon(m.color,30));
-  m.bringToFront();
-  m.openTooltip();
+ if(activeMarker && activeMarker!==m){
+  activeMarker.setIcon(icon(activeMarker.color,22));
+ }
 
-  activeMarker=m;
+ m.setIcon(icon(m.color,30));
+ m.bringToFront();
+ m.openTooltip();
+
+ activeMarker=m;
 }
 
 function reset(){
-  timer=setTimeout(()=>{
-    if(activeMarker){
-      activeMarker.setIcon(icon(activeMarker.color,22));
-      activeMarker=null;
-    }
-  },80);
+ timer=setTimeout(()=>{
+  if(activeMarker){
+   activeMarker.setIcon(icon(activeMarker.color,22));
+   activeMarker=null;
+  }
+ },80);
 }
 
-// FILTRO
 function filtros(rutas){
 
  const div=document.getElementById("filters");
@@ -175,8 +163,8 @@ function filtros(rutas){
   chk.type="checkbox"; chk.checked=true;
 
   chk.onchange=()=>{
-    chk.checked?activeRoutes.add(ruta):activeRoutes.delete(ruta);
-    render();
+   chk.checked?activeRoutes.add(ruta):activeRoutes.delete(ruta);
+   render();
   };
 
   let color=document.createElement("div");
@@ -191,18 +179,15 @@ function filtros(rutas){
   let lista=document.createElement("div");
   lista.className="tiendas";
 
-  let tiendas=[...new Set(
-    dataGlobal.filter(r=>r[8]===ruta).map(r=>r[1])
-  )];
+  let tiendas=[...new Set(dataGlobal
+    .filter(r=>r[8]===ruta)
+    .map(r=>r[1]))];
 
   tiendas.forEach(t=>{
-
     let d=document.createElement("div");
     d.textContent="• "+t;
-
     d.onmouseenter=()=>highlight(t);
     d.onmouseleave=()=>reset();
-
     lista.appendChild(d);
   });
 
@@ -219,7 +204,6 @@ function filtros(rutas){
  });
 }
 
-// RENDER
 function render(){
 
  markers.forEach(m=>map.removeLayer(m));
@@ -240,9 +224,10 @@ function render(){
   markers.push(m);
   markerMap[r[1]]=m;
  });
-
 }
 
 </script>
+
 </body>
 </html>
+``
