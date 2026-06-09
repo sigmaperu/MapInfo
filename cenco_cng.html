@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>CENCOSUD - Verificación Coordenadas</title>
 
-<!-- ✅ Leaflet BIEN -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
@@ -21,7 +20,7 @@
     padding:15px;
     border-radius:10px;
     box-shadow:0 4px 15px rgba(0,0,0,0.25);
-    width:240px;
+    width:260px;
     max-height:90%;
     overflow:auto;
   }
@@ -44,9 +43,13 @@
     font-size:13px;
   }
 
-  .item-header:hover {
-    background:#f5f5f5;
-    border-radius:4px;
+  .arrow {
+    margin-right:5px;
+    transition:0.2s;
+  }
+
+  .arrow.open {
+    transform:rotate(180deg);
   }
 
   .color-box {
@@ -57,16 +60,21 @@
   }
 
   .tiendas {
-    margin-left:22px;
+    margin-left:20px;
     margin-top:5px;
     font-size:12px;
-    max-height:120px;
+    max-height:140px;
     overflow:auto;
     display:none;
   }
 
   .tiendas div {
-    padding:2px 0;
+    padding:3px 0;
+    cursor:pointer;
+  }
+
+  .tiendas div:hover {
+    background:#f3f3f3;
   }
 
 </style>
@@ -94,6 +102,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 // ========================
 let markers = [];
+let markerMap = {}; // 🔥 clave: tienda → marcador
 let dataGlobal = [];
 let activeRoutes = new Set();
 let colorMap = {};
@@ -104,57 +113,74 @@ const colors = [
 ];
 
 // ========================
-// ICONO tipo Google
-function createIcon(color) {
+// ICONOS
+function createIcon(color, size=22) {
   return L.divIcon({
     className: '',
     html: `
-      <svg width="22" height="34" viewBox="0 0 24 36">
+      <svg width="${size}" height="${size*1.5}" viewBox="0 0 24 36">
         <path d="M12 0C5 0 0 6 0 13c0 10 12 23 12 23s12-13 12-23C24 6 19 0 12 0z"
               fill="${color}" stroke="black"/>
         <circle cx="12" cy="13" r="5" fill="white"/>
       </svg>
     `,
-    iconSize: [22,34],
-    iconAnchor: [11,34]
+    iconSize: [size, size*1.5],
+    iconAnchor: [size/2, size*1.5]
   });
 }
 
 // ========================
-// CARGA CSV
+// LOAD CSV
 fetch(URL)
-  .then(r => r.text())
-  .then(text => {
+.then(r => r.text())
+.then(text => {
 
-    let rows = text.split("\n").map(r => r.split(","));
-    rows.shift();
+  let rows = text.split("\n").map(r => r.split(","));
+  rows.shift();
 
-    // quitar sin ruta
-    rows = rows.filter(r => r[8] && r[8].trim() !== "");
+  rows = rows.filter(r => r[8] && r[8].trim() !== "");
+  dataGlobal = rows;
 
-    dataGlobal = rows;
+  let rutas = [...new Set(rows.map(r => r[8]))];
 
-    // rutas únicas
-    let rutas = [...new Set(rows.map(r => r[8]))];
-
-    // ordenar DIA 1, DIA 2...
-    rutas.sort((a,b) => {
-      let na = parseInt(a.replace(/\D/g,'')) || 0;
-      let nb = parseInt(b.replace(/\D/g,'')) || 0;
-      return na - nb;
-    });
-
-    rutas.forEach((ruta,i)=>{
-      colorMap[ruta] = colors[i % colors.length];
-      activeRoutes.add(ruta);
-    });
-
-    crearFiltros(rutas);
-    render();
+  rutas.sort((a,b)=>{
+    let na = parseInt(a.replace(/\D/g,'')) || 0;
+    let nb = parseInt(b.replace(/\D/g,'')) || 0;
+    return na - nb;
   });
 
+  rutas.forEach((ruta,i)=>{
+    colorMap[ruta] = colors[i % colors.length];
+    activeRoutes.add(ruta);
+  });
+
+  crearFiltros(rutas);
+  render();
+});
+
 // ========================
-// FILTROS con desplegable
+// INTERACCIÓN
+let lastMarker = null;
+
+function highlightMarker(tienda){
+
+  let marker = markerMap[tienda];
+  if(!marker) return;
+
+  // reset anterior
+  if(lastMarker){
+    lastMarker.setIcon(createIcon(lastMarker.defaultColor));
+  }
+
+  marker.setIcon(createIcon("#f1c40f", 28)); // amarillo grande
+  marker.bringToFront();
+  marker.openTooltip();
+
+  lastMarker = marker;
+}
+
+// ========================
+// FILTROS
 function crearFiltros(rutas){
 
   const div = document.getElementById("filters");
@@ -167,12 +193,16 @@ function crearFiltros(rutas){
     let header = document.createElement("div");
     header.className = "item-header";
 
+    let arrow = document.createElement("span");
+    arrow.className = "arrow";
+    arrow.innerHTML = "▼";
+
     let chk = document.createElement("input");
     chk.type = "checkbox";
     chk.checked = true;
 
-    chk.onchange = () => {
-      if (chk.checked) activeRoutes.add(ruta);
+    chk.onchange = ()=>{
+      if(chk.checked) activeRoutes.add(ruta);
       else activeRoutes.delete(ruta);
       render();
     };
@@ -184,15 +214,14 @@ function crearFiltros(rutas){
     let text = document.createElement("span");
     text.innerText = ruta;
 
+    header.appendChild(arrow);
     header.appendChild(chk);
     header.appendChild(color);
     header.appendChild(text);
 
-    // contenedor tiendas
     let tiendasDiv = document.createElement("div");
     tiendasDiv.className = "tiendas";
 
-    // obtener tiendas únicas
     let tiendas = [...new Set(
       dataGlobal.filter(r => r[8] === ruta).map(r => r[1])
     )];
@@ -200,16 +229,20 @@ function crearFiltros(rutas){
     tiendas.forEach(t => {
       let d = document.createElement("div");
       d.textContent = "• " + t;
+
+      d.onmouseover = ()=> highlightMarker(t);
+      d.onclick = ()=> highlightMarker(t);
+
       tiendasDiv.appendChild(d);
     });
 
-    // toggle desplegable
-    header.addEventListener("click", (e) => {
-      if (e.target.type !== "checkbox") {
-        tiendasDiv.style.display =
-          tiendasDiv.style.display === "none" ? "block" : "none";
+    header.onclick = (e)=>{
+      if(e.target.type !== "checkbox"){
+        let open = tiendasDiv.style.display === "block";
+        tiendasDiv.style.display = open ? "none" : "block";
+        arrow.classList.toggle("open");
       }
-    });
+    };
 
     cont.appendChild(header);
     cont.appendChild(tiendasDiv);
@@ -224,6 +257,7 @@ function render(){
 
   markers.forEach(m => map.removeLayer(m));
   markers = [];
+  markerMap = {};
 
   dataGlobal.forEach(r => {
 
@@ -241,10 +275,15 @@ function render(){
       icon: createIcon(colorMap[ruta])
     });
 
+    marker.defaultColor = colorMap[ruta];
+
     marker.bindTooltip(`<b>${tienda}</b><br>VH: ${vh}`);
 
     marker.addTo(map);
     markers.push(marker);
+
+    // 🔥 guardar referencia
+    markerMap[tienda] = marker;
   });
 }
 
@@ -252,4 +291,3 @@ function render(){
 
 </body>
 </html>
-``
