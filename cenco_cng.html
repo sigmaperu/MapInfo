@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Verificación Coordenadas CENCOSUD</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+  html, body { margin:0; padding:0; height:100%; }
+  #map { height:100%; }
+
+  .panel {
+    position:absolute;
+    top:10px;
+    left:10px;
+    z-index:1000;
+    background:white;
+    padding:10px;
+    border-radius:8px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.3);
+    font-family:Arial;
+    max-height:90%;
+    overflow:auto;
+  }
+
+  .panel label {
+    display:block;
+    margin-bottom:4px;
+    font-size:13px;
+  }
+
+</style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<div class="panel">
+  <strong>Filtro Ruta</strong><br>
+  <div id="filters"></div>
+</div>
+
+<script>
+
+// ========================
+// CONFIG
+// ========================
+const URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/CENCOSUD.csv";
+
+// ========================
+// MAPA
+// ========================
+const map = L.map('map').setView([-12.05, -77.04], 11);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
+}).addTo(map);
+
+let markersLayer = L.layerGroup().addTo(map);
+
+// ========================
+// COLORES
+// ========================
+const colors = [
+  "red","blue","green","orange","purple",
+  "darkred","cadetblue","black","pink"
+];
+
+let colorMap = {};
+let activeRoutes = new Set();
+
+// ========================
+// CARGAR CSV
+// ========================
+fetch(URL)
+  .then(r => r.text())
+  .then(text => {
+
+    let rows = text.split("\n").map(r => r.split(","));
+
+    // quitar header
+    rows.shift();
+
+    let rutasUnicas = [...new Set(rows.map(r => r[8]).filter(x => x))];
+
+    // asignar colores
+    rutasUnicas.forEach((ruta, i) => {
+      colorMap[ruta] = colors[i % colors.length];
+      activeRoutes.add(ruta);
+    });
+
+    crearFiltros(rutasUnicas);
+    pintar(rows);
+
+  });
+
+// ========================
+// FILTROS
+// ========================
+function crearFiltros(rutas) {
+  const div = document.getElementById("filters");
+
+  rutas.forEach(ruta => {
+    let id = "chk_" + ruta;
+
+    let label = document.createElement("label");
+
+    label.innerHTML = `
+      <input type="checkbox" id="${id}" checked onchange="toggleRuta('${ruta}')">
+      ${ruta}
+    `;
+
+    div.appendChild(label);
+  });
+}
+
+function toggleRuta(ruta){
+  if (activeRoutes.has(ruta)) {
+    activeRoutes.delete(ruta);
+  } else {
+    activeRoutes.add(ruta);
+  }
+  actualizar();
+}
+
+// ========================
+// PINTAR
+// ========================
+let dataGlobal = [];
+
+function pintar(rows){
+  dataGlobal = rows;
+  actualizar();
+}
+
+function actualizar(){
+
+  markersLayer.clearLayers();
+
+  dataGlobal.forEach(r => {
+
+    let lat = parseFloat(r[6]);
+    let lon = parseFloat(r[7]);
+    let ruta = r[8];
+
+    if (!lat || !lon) return;
+    if (!activeRoutes.has(ruta)) return;
+
+    let tienda = r[1];
+    let vh = r[2];
+
+    let color = colorMap[ruta];
+
+    let marker = L.circleMarker([lat, lon], {
+      radius:6,
+      fillColor:color,
+      color:"#000",
+      weight:1,
+      fillOpacity:0.9
+    });
+
+    marker.bindTooltip(`<b>${tienda}</b><br>VH: ${vh}`);
+
+    markersLayer.addLayer(marker);
+  });
+}
+
+</script>
+
+</body>
+</html>
