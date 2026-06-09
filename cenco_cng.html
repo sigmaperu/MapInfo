@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <title>CENCOSUD - Verificación Coordenadas</title>
 
-<!-- ✅ FIX REAL (ESTO ERA EL ERROR) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- ✅ Leaflet correcto -->
+https://unpkg.com/leaflet/dist/leaflet.css
+https://unpkg.com/leaflet/dist/leaflet.js
 
 <style>
 html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
@@ -105,7 +105,8 @@ let markerMap = {};
 let dataGlobal = [];
 let activeRoutes = new Set();
 let colorMap = {};
-let lastMarker = null;
+let activeMarker = null;
+let resetTimer = null;
 
 const colors = [
   "#e74c3c","#3498db","#2ecc71","#f39c12",
@@ -113,7 +114,7 @@ const colors = [
 ];
 
 // ========================
-// ICONOS
+// ICONO
 function createIcon(color, size=22) {
   return L.divIcon({
     className: '',
@@ -130,7 +131,7 @@ function createIcon(color, size=22) {
 }
 
 // ========================
-// CARGA CSV
+// LOAD
 fetch(URL)
 .then(r => r.text())
 .then(text => {
@@ -138,13 +139,11 @@ fetch(URL)
   let rows = text.split("\n").map(r => r.split(","));
   rows.shift();
 
-  // limpiar sin ruta
   rows = rows.filter(r => r[8] && r[8].trim() !== "");
   dataGlobal = rows;
 
   let rutas = [...new Set(rows.map(r => r[8]))];
 
-  // ordenar DIA 1... DIA N
   rutas.sort((a,b)=>{
     let na = parseInt(a.replace(/\D/g,'')) || 0;
     let nb = parseInt(b.replace(/\D/g,'')) || 0;
@@ -161,30 +160,39 @@ fetch(URL)
 });
 
 // ========================
-// HIGHLIGHT
+// HIGHLIGHT CORRECTO
 function highlightMarker(tienda){
 
   let marker = markerMap[tienda];
   if(!marker) return;
 
-  // reset anterior
-  if(lastMarker){
-    lastMarker.setIcon(createIcon(lastMarker.defaultColor,22));
+  // limpiar timer previo
+  if (resetTimer) clearTimeout(resetTimer);
+
+  // reset anterior inmediato
+  if(activeMarker && activeMarker !== marker){
+    activeMarker.setIcon(createIcon(activeMarker.defaultColor,22));
   }
 
-  // solo agrandar (MISMO color)
+  // activar nuevo
   marker.setIcon(createIcon(marker.defaultColor,30));
   marker.bringToFront();
   marker.openTooltip();
 
-  lastMarker = marker;
+  activeMarker = marker;
 }
 
+// ✅ SIEMPRE VUELVE A NORMAL
 function resetHighlight(){
-  if(lastMarker){
-    lastMarker.setIcon(createIcon(lastMarker.defaultColor,22));
-    lastMarker = null;
-  }
+
+  if (resetTimer) clearTimeout(resetTimer);
+
+  resetTimer = setTimeout(() => {
+    if(activeMarker){
+      activeMarker.setIcon(createIcon(activeMarker.defaultColor,22));
+      activeMarker = null;
+    }
+  }, 80); // pequeño delay evita fallos de hover
 }
 
 // ========================
@@ -230,7 +238,6 @@ function crearFiltros(rutas){
     let tiendasDiv = document.createElement("div");
     tiendasDiv.className = "tiendas";
 
-    // tiendas únicas
     let tiendas = [...new Set(
       dataGlobal.filter(r => r[8] === ruta).map(r => r[1])
     )];
@@ -241,7 +248,6 @@ function crearFiltros(rutas){
 
       d.onmouseover = ()=> highlightMarker(t);
       d.onmouseout = ()=> resetHighlight();
-      d.onclick = ()=> highlightMarker(t);
 
       tiendasDiv.appendChild(d);
     });
@@ -267,7 +273,7 @@ function render(){
   markers.forEach(m => map.removeLayer(m));
   markers = [];
   markerMap = {};
-  resetHighlight();
+  activeMarker = null;
 
   dataGlobal.forEach(r => {
 
@@ -300,4 +306,3 @@ function render(){
 
 </body>
 </html>
-``
