@@ -21,6 +21,7 @@
     border-radius:8px;
     box-shadow:0 2px 8px rgba(0,0,0,0.3);
     font-family:Arial;
+    font-size:13px;
     max-height:90%;
     overflow:auto;
   }
@@ -28,9 +29,7 @@
   .panel label {
     display:block;
     margin-bottom:4px;
-    font-size:13px;
   }
-
 </style>
 </head>
 
@@ -39,7 +38,7 @@
 <div id="map"></div>
 
 <div class="panel">
-  <strong>Filtro Ruta</strong><br>
+  <strong>Filtro Ruta</strong>
   <div id="filters"></div>
 </div>
 
@@ -59,18 +58,36 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19
 }).addTo(map);
 
-let markersLayer = L.layerGroup().addTo(map);
+// ========================
+// VARIABLES
+// ========================
+let markers = [];
+let dataGlobal = [];
+let activeRoutes = new Set();
+let colorMap = {};
 
-// ========================
-// COLORES
-// ========================
 const colors = [
   "red","blue","green","orange","purple",
-  "darkred","cadetblue","black","pink"
+  "cadetblue","black","pink"
 ];
 
-let colorMap = {};
-let activeRoutes = new Set();
+// ========================
+// ICONO tipo Google Maps
+// ========================
+function createIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `
+      <svg width="22" height="34" viewBox="0 0 24 36">
+        <path d="M12 0C5 0 0 6 0 13c0 10 12 23 12 23s12-13 12-23C24 6 19 0 12 0z"
+              fill="${color}" stroke="black"/>
+        <circle cx="12" cy="13" r="5" fill="white"/>
+      </svg>
+    `,
+    iconSize: [22,34],
+    iconAnchor: [11,34]
+  });
+}
 
 // ========================
 // CARGAR CSV
@@ -80,91 +97,83 @@ fetch(URL)
   .then(text => {
 
     let rows = text.split("\n").map(r => r.split(","));
-
-    // quitar header
     rows.shift();
 
-    let rutasUnicas = [...new Set(rows.map(r => r[8]).filter(x => x))];
+    // ✅ eliminar registros sin ruta
+    rows = rows.filter(r => r[8] && r[8].trim() !== "");
 
-    // asignar colores
+    dataGlobal = rows;
+
+    // rutas únicas
+    let rutasUnicas = [...new Set(rows.map(r => r[8]))];
+
+    // asignar colores + activar todos
     rutasUnicas.forEach((ruta, i) => {
       colorMap[ruta] = colors[i % colors.length];
       activeRoutes.add(ruta);
     });
 
     crearFiltros(rutasUnicas);
-    pintar(rows);
-
+    render();
   });
 
 // ========================
 // FILTROS
 // ========================
 function crearFiltros(rutas) {
+
   const div = document.getElementById("filters");
 
   rutas.forEach(ruta => {
-    let id = "chk_" + ruta;
+
+    let chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.checked = true;
+
+    chk.onchange = () => {
+      if (chk.checked) activeRoutes.add(ruta);
+      else activeRoutes.delete(ruta);
+      render();
+    };
 
     let label = document.createElement("label");
-
-    label.innerHTML = `
-      <input type="checkbox" id="${id}" checked onchange="toggleRuta('${ruta}')">
-      ${ruta}
-    `;
+    label.appendChild(chk);
+    label.append(" " + ruta);
 
     div.appendChild(label);
   });
 }
 
-function toggleRuta(ruta){
-  if (activeRoutes.has(ruta)) {
-    activeRoutes.delete(ruta);
-  } else {
-    activeRoutes.add(ruta);
-  }
-  actualizar();
-}
-
 // ========================
-// PINTAR
+// RENDER (CORE)
 // ========================
-let dataGlobal = [];
+function render(){
 
-function pintar(rows){
-  dataGlobal = rows;
-  actualizar();
-}
-
-function actualizar(){
-
-  markersLayer.clearLayers();
+  // eliminar markers actuales
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
 
   dataGlobal.forEach(r => {
 
+    let ruta = r[8];
+    if (!activeRoutes.has(ruta)) return;
+
     let lat = parseFloat(r[6]);
     let lon = parseFloat(r[7]);
-    let ruta = r[8];
 
     if (!lat || !lon) return;
-    if (!activeRoutes.has(ruta)) return;
 
     let tienda = r[1];
     let vh = r[2];
 
-    let color = colorMap[ruta];
-
-    let marker = L.circleMarker([lat, lon], {
-      radius:6,
-      fillColor:color,
-      color:"#000",
-      weight:1,
-      fillOpacity:0.9
+    let marker = L.marker([lat, lon], {
+      icon: createIcon(colorMap[ruta])
     });
 
     marker.bindTooltip(`<b>${tienda}</b><br>VH: ${vh}`);
 
-    markersLayer.addLayer(marker);
+    marker.addTo(map);
+    markers.push(marker);
   });
 }
 
