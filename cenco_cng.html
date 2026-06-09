@@ -4,79 +4,78 @@
 <meta charset="UTF-8">
 <title>CENCOSUD - Verificación Coordenadas</title>
 
+<!-- ✅ FIX REAL (ESTO ERA EL ERROR) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
-  html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
-  #map { height:100%; }
+html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
+#map { height:100%; }
 
-  .panel {
-    position:absolute;
-    top:15px;
-    left:15px;
-    z-index:1000;
-    background:white;
-    padding:15px;
-    border-radius:10px;
-    box-shadow:0 4px 15px rgba(0,0,0,0.25);
-    width:260px;
-    max-height:90%;
-    overflow:auto;
-  }
+.panel {
+  position:absolute;
+  top:15px;
+  left:15px;
+  z-index:1000;
+  background:white;
+  padding:15px;
+  border-radius:10px;
+  box-shadow:0 4px 15px rgba(0,0,0,0.25);
+  width:260px;
+  max-height:90%;
+  overflow:auto;
+}
 
-  .panel h3 {
-    margin:0 0 10px 0;
-    font-size:14px;
-  }
+.panel h3 {
+  margin:0 0 10px 0;
+  font-size:14px;
+}
 
-  .item {
-    margin-bottom:8px;
-    border-bottom:1px solid #eee;
-    padding-bottom:5px;
-  }
+.item {
+  margin-bottom:8px;
+  border-bottom:1px solid #eee;
+  padding-bottom:5px;
+}
 
-  .item-header {
-    display:flex;
-    align-items:center;
-    cursor:pointer;
-    font-size:13px;
-  }
+.item-header {
+  display:flex;
+  align-items:center;
+  cursor:pointer;
+  font-size:13px;
+}
 
-  .arrow {
-    margin-right:5px;
-    transition:0.2s;
-  }
+.arrow {
+  margin-right:5px;
+  transition:0.2s;
+}
+.arrow.open {
+  transform:rotate(180deg);
+}
 
-  .arrow.open {
-    transform:rotate(180deg);
-  }
+.color-box {
+  width:12px;
+  height:12px;
+  border-radius:3px;
+  margin:0 6px;
+}
 
-  .color-box {
-    width:12px;
-    height:12px;
-    border-radius:3px;
-    margin:0 6px;
-  }
+.tiendas {
+  margin-left:20px;
+  margin-top:5px;
+  font-size:12px;
+  max-height:140px;
+  overflow:auto;
+  display:none;
+}
 
-  .tiendas {
-    margin-left:20px;
-    margin-top:5px;
-    font-size:12px;
-    max-height:140px;
-    overflow:auto;
-    display:none;
-  }
+.tiendas div {
+  padding:3px 0;
+  cursor:pointer;
+}
 
-  .tiendas div {
-    padding:3px 0;
-    cursor:pointer;
-  }
-
-  .tiendas div:hover {
-    background:#f3f3f3;
-  }
-
+.tiendas div:hover {
+  background:#f3f3f3;
+}
 </style>
 </head>
 
@@ -102,10 +101,11 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 // ========================
 let markers = [];
-let markerMap = {}; // 🔥 clave: tienda → marcador
+let markerMap = {};
 let dataGlobal = [];
 let activeRoutes = new Set();
 let colorMap = {};
+let lastMarker = null;
 
 const colors = [
   "#e74c3c","#3498db","#2ecc71","#f39c12",
@@ -130,7 +130,7 @@ function createIcon(color, size=22) {
 }
 
 // ========================
-// LOAD CSV
+// CARGA CSV
 fetch(URL)
 .then(r => r.text())
 .then(text => {
@@ -138,11 +138,13 @@ fetch(URL)
   let rows = text.split("\n").map(r => r.split(","));
   rows.shift();
 
+  // limpiar sin ruta
   rows = rows.filter(r => r[8] && r[8].trim() !== "");
   dataGlobal = rows;
 
   let rutas = [...new Set(rows.map(r => r[8]))];
 
+  // ordenar DIA 1... DIA N
   rutas.sort((a,b)=>{
     let na = parseInt(a.replace(/\D/g,'')) || 0;
     let nb = parseInt(b.replace(/\D/g,'')) || 0;
@@ -159,9 +161,7 @@ fetch(URL)
 });
 
 // ========================
-// INTERACCIÓN
-let lastMarker = null;
-
+// HIGHLIGHT
 function highlightMarker(tienda){
 
   let marker = markerMap[tienda];
@@ -169,14 +169,22 @@ function highlightMarker(tienda){
 
   // reset anterior
   if(lastMarker){
-    lastMarker.setIcon(createIcon(lastMarker.defaultColor));
+    lastMarker.setIcon(createIcon(lastMarker.defaultColor,22));
   }
 
-  marker.setIcon(createIcon("#f1c40f", 28)); // amarillo grande
+  // solo agrandar (MISMO color)
+  marker.setIcon(createIcon(marker.defaultColor,30));
   marker.bringToFront();
   marker.openTooltip();
 
   lastMarker = marker;
+}
+
+function resetHighlight(){
+  if(lastMarker){
+    lastMarker.setIcon(createIcon(lastMarker.defaultColor,22));
+    lastMarker = null;
+  }
 }
 
 // ========================
@@ -222,6 +230,7 @@ function crearFiltros(rutas){
     let tiendasDiv = document.createElement("div");
     tiendasDiv.className = "tiendas";
 
+    // tiendas únicas
     let tiendas = [...new Set(
       dataGlobal.filter(r => r[8] === ruta).map(r => r[1])
     )];
@@ -231,6 +240,7 @@ function crearFiltros(rutas){
       d.textContent = "• " + t;
 
       d.onmouseover = ()=> highlightMarker(t);
+      d.onmouseout = ()=> resetHighlight();
       d.onclick = ()=> highlightMarker(t);
 
       tiendasDiv.appendChild(d);
@@ -246,7 +256,6 @@ function crearFiltros(rutas){
 
     cont.appendChild(header);
     cont.appendChild(tiendasDiv);
-
     div.appendChild(cont);
   });
 }
@@ -258,6 +267,7 @@ function render(){
   markers.forEach(m => map.removeLayer(m));
   markers = [];
   markerMap = {};
+  resetHighlight();
 
   dataGlobal.forEach(r => {
 
@@ -282,7 +292,6 @@ function render(){
     marker.addTo(map);
     markers.push(marker);
 
-    // 🔥 guardar referencia
     markerMap[tienda] = marker;
   });
 }
@@ -291,3 +300,4 @@ function render(){
 
 </body>
 </html>
+``
