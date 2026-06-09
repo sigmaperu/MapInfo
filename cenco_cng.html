@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <title>CENCOSUD - Verificación Coordenadas</title>
 
-<!-- ✅ IMPORTS CORRECTOS -->
+<!-- ✅ ESTO ES LO QUE TE FALTABA -->
 https://unpkg.com/leaflet/dist/leaflet.css
-https://unpkg.com/leaflet/dist/leaflet.jsscript>
+https://unpkg.com/leaflet/dist/leaflet.js
 
 <style>
 html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
@@ -26,13 +26,7 @@ html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
   overflow:auto;
 }
 
-.panel h3 { margin:0 0 10px 0; font-size:14px; }
-
-.item {
-  margin-bottom:8px;
-  border-bottom:1px solid #eee;
-  padding-bottom:5px;
-}
+.item { margin-bottom:8px; border-bottom:1px solid #eee; }
 
 .item-header {
   display:flex;
@@ -41,25 +35,19 @@ html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
   font-size:13px;
 }
 
-.arrow {
-  margin-right:6px;
-  transition:0.2s;
-}
+.arrow { margin-right:6px; transition:0.2s; }
 .arrow.open { transform:rotate(180deg); }
 
 .color-box {
-  width:12px;
-  height:12px;
+  width:12px; height:12px;
   border-radius:3px;
   margin:0 6px;
 }
 
 .tiendas {
-  margin-left:22px;
+  margin-left:20px;
   margin-top:5px;
   font-size:12px;
-  max-height:140px;
-  overflow:auto;
   display:none;
 }
 
@@ -67,221 +55,194 @@ html, body { margin:0; padding:0; height:100%; font-family:Segoe UI, Arial; }
   padding:3px 0;
   cursor:pointer;
 }
-.tiendas div:hover {
-  background:#f3f3f3;
-}
+
+.tiendas div:hover { background:#f3f3f3; }
 </style>
 </head>
 
 <body>
 
 <div id="map"></div>
-
 <div class="panel">
-  <h3>Filtro Ruta</h3>
+  <b>Filtro Ruta</b>
   <div id="filters"></div>
 </div>
 
 <script>
 
-const URL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/CENCOSUD.csv";
+const URL="https://raw.githubusercontent.com/sigmaperu/MapInfo/main/CENCOSUD.csv";
 
-// ================= MAPA
-const map = L.map('map').setView([-12.05, -77.04], 11);
+// MAPA
+const map=L.map('map').setView([-12.05,-77.04],11);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  maxZoom:19
-}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// ================= VARIABLES
-let markers = [];
-let markerMap = {};
-let dataGlobal = [];
-let activeRoutes = new Set();
-let colorMap = {};
-let activeMarker = null;
-let resetTimer = null;
+// VARIABLES
+let markers=[], markerMap={}, dataGlobal=[];
+let activeRoutes=new Set(), colorMap={};
+let activeMarker=null, timer=null;
 
-const colors = [
-  "#e74c3c","#3498db","#2ecc71","#f39c12",
-  "#9b59b6","#16a085","#2c3e50","#e84393"
+const colors=[
+ "#e74c3c","#3498db","#2ecc71","#f39c12",
+ "#9b59b6","#16a085","#2c3e50","#e84393"
 ];
 
-// ================= ICONO
-function createIcon(color,size=22){
+// ICONO
+function icon(color,size=22){
   return L.divIcon({
-    className:'',
-    html:`
-    <svg width="${size}" height="${size*1.5}" viewBox="0 0 24 36">
-      <path d="M12 0C5 0 0 6 0 13c0 10 12 23 12 23s12-13 12-23C24 6 19 0 12 0z"
-      fill="${color}" stroke="black"/>
-      <circle cx="12" cy="13" r="5" fill="white"/>
+    html:`<svg width="${size}" height="${size*1.5}" viewBox="0 0 24 36">
+    <path d="M12 0C5 0 0 6 0 13c0 10 12 23 12 23s12-13 12-23C24 6 19 0 12 0z"
+    fill="${color}" stroke="black"/>
+    <circle cx="12" cy="13" r="5" fill="white"/>
     </svg>`,
+    className:'',
     iconSize:[size,size*1.5],
     iconAnchor:[size/2,size*1.5]
   });
 }
 
-// ================= LOAD
+// LOAD
 fetch(URL)
 .then(r=>r.text())
 .then(text=>{
 
-  let rows=text.split("\n").map(r=>r.split(","));
-  rows.shift();
+ let rows=text.split("\n").map(r=>r.split(","));
+ rows.shift();
 
-  rows=rows.filter(r=>r[8] && r[8].trim()!=="");
-  dataGlobal=rows;
+ dataGlobal=rows.filter(r=>r[8] && r[8].trim());
 
-  let rutas=[...new Set(rows.map(r=>r[8]))];
+ let rutas=[...new Set(dataGlobal.map(r=>r[8]))];
 
-  rutas.sort((a,b)=>{
-    let na=parseInt(a.replace(/\D/g,''))||0;
-    let nb=parseInt(b.replace(/\D/g,''))||0;
-    return na-nb;
-  });
+ rutas.sort((a,b)=>
+   (parseInt(a.replace(/\D/g,''))||0) -
+   (parseInt(b.replace(/\D/g,''))||0)
+ );
 
-  rutas.forEach((ruta,i)=>{
-    colorMap[ruta]=colors[i%colors.length];
-    activeRoutes.add(ruta);
-  });
+ rutas.forEach((ruta,i)=>{
+   colorMap[ruta]=colors[i%colors.length];
+   activeRoutes.add(ruta);
+ });
 
-  crearFiltros(rutas);
-  render();
+ filtros(rutas);
+ render();
 });
 
-// ================= HIGHLIGHT
-function highlightMarker(tienda){
+// HIGHLIGHT
+function highlight(tienda){
+  let m=markerMap[tienda];
+  if(!m) return;
 
-  let marker=markerMap[tienda];
-  if(!marker) return;
+  clearTimeout(timer);
 
-  if(resetTimer) clearTimeout(resetTimer);
-
-  if(activeMarker && activeMarker!==marker){
-    activeMarker.setIcon(createIcon(activeMarker.defaultColor,22));
+  if(activeMarker && activeMarker!==m){
+    activeMarker.setIcon(icon(activeMarker.color,22));
   }
 
-  marker.setIcon(createIcon(marker.defaultColor,30));
-  marker.bringToFront();
-  marker.openTooltip();
+  m.setIcon(icon(m.color,30));
+  m.bringToFront();
+  m.openTooltip();
 
-  activeMarker=marker;
+  activeMarker=m;
 }
 
-function resetHighlight(){
-
-  if(resetTimer) clearTimeout(resetTimer);
-
-  resetTimer=setTimeout(()=>{
+function reset(){
+  timer=setTimeout(()=>{
     if(activeMarker){
-      activeMarker.setIcon(createIcon(activeMarker.defaultColor,22));
+      activeMarker.setIcon(icon(activeMarker.color,22));
       activeMarker=null;
     }
   },80);
 }
 
-// ================= FILTROS
-function crearFiltros(rutas){
+// FILTRO
+function filtros(rutas){
 
-  const div=document.getElementById("filters");
+ const div=document.getElementById("filters");
 
-  rutas.forEach(ruta=>{
+ rutas.forEach(ruta=>{
 
-    let cont=document.createElement("div");
-    cont.className="item";
+  let cont=document.createElement("div");
+  cont.className="item";
 
-    let header=document.createElement("div");
-    header.className="item-header";
+  let header=document.createElement("div");
+  header.className="item-header";
 
-    let arrow=document.createElement("span");
-    arrow.className="arrow";
-    arrow.innerHTML="▼";
+  let arrow=document.createElement("span");
+  arrow.className="arrow";
+  arrow.innerHTML="▼";
 
-    let chk=document.createElement("input");
-    chk.type="checkbox";
-    chk.checked=true;
+  let chk=document.createElement("input");
+  chk.type="checkbox"; chk.checked=true;
 
-    chk.onchange=()=>{
-      chk.checked ? activeRoutes.add(ruta) : activeRoutes.delete(ruta);
-      render();
-    };
+  chk.onchange=()=>{
+    chk.checked?activeRoutes.add(ruta):activeRoutes.delete(ruta);
+    render();
+  };
 
-    let color=document.createElement("div");
-    color.className="color-box";
-    color.style.background=colorMap[ruta];
+  let color=document.createElement("div");
+  color.className="color-box";
+  color.style.background=colorMap[ruta];
 
-    let text=document.createElement("span");
-    text.innerText=ruta;
+  let txt=document.createElement("span");
+  txt.innerText=ruta;
 
-    header.append(arrow,chk,color,text);
+  header.append(arrow,chk,color,txt);
 
-    let tiendasDiv=document.createElement("div");
-    tiendasDiv.className="tiendas";
+  let lista=document.createElement("div");
+  lista.className="tiendas";
 
-    let tiendas=[...new Set(
-      dataGlobal.filter(r=>r[8]===ruta).map(r=>r[1])
-    )];
+  let tiendas=[...new Set(
+    dataGlobal.filter(r=>r[8]===ruta).map(r=>r[1])
+  )];
 
-    tiendas.forEach(t=>{
-      let d=document.createElement("div");
-      d.textContent="• "+t;
+  tiendas.forEach(t=>{
 
-      d.onmouseenter=()=>highlightMarker(t);
-      d.onmouseleave=()=>resetHighlight();
+    let d=document.createElement("div");
+    d.textContent="• "+t;
 
-      tiendasDiv.appendChild(d);
-    });
+    d.onmouseenter=()=>highlight(t);
+    d.onmouseleave=()=>reset();
 
-    header.onclick=(e)=>{
-      if(e.target.type!=="checkbox"){
-        let open=tiendasDiv.style.display==="block";
-        tiendasDiv.style.display=open?"none":"block";
-        arrow.classList.toggle("open");
-      }
-    };
-
-    cont.append(header,tiendasDiv);
-    div.appendChild(cont);
+    lista.appendChild(d);
   });
+
+  header.onclick=(e)=>{
+    if(e.target.type!=="checkbox"){
+      let open=lista.style.display==="block";
+      lista.style.display=open?"none":"block";
+      arrow.classList.toggle("open");
+    }
+  };
+
+  cont.append(header,lista);
+  div.appendChild(cont);
+ });
 }
 
-// ================= RENDER
+// RENDER
 function render(){
 
-  markers.forEach(m=>map.removeLayer(m));
-  markers=[];
-  markerMap={};
-  activeMarker=null;
+ markers.forEach(m=>map.removeLayer(m));
+ markers=[]; markerMap={}; activeMarker=null;
 
-  dataGlobal.forEach(r=>{
+ dataGlobal.forEach(r=>{
 
-    let ruta=r[8];
-    if(!activeRoutes.has(ruta)) return;
+  if(!activeRoutes.has(r[8])) return;
 
-    let lat=parseFloat(r[6]);
-    let lon=parseFloat(r[7]);
-    if(!lat||!lon) return;
+  let lat=parseFloat(r[6]), lon=parseFloat(r[7]);
+  if(!lat||!lon) return;
 
-    let tienda=r[1];
-    let vh=r[2];
+  let m=L.marker([lat,lon],{icon:icon(colorMap[r[8]])})
+   .bindTooltip(`<b>${r[1]}</b><br>VH: ${r[2]}`)
+   .addTo(map);
 
-    let marker=L.marker([lat,lon],{
-      icon:createIcon(colorMap[ruta])
-    });
+  m.color=colorMap[r[8]];
+  markers.push(m);
+  markerMap[r[1]]=m;
+ });
 
-    marker.defaultColor=colorMap[ruta];
-
-    marker.bindTooltip(`<b>${tienda}</b><br>VH: ${vh}`);
-
-    marker.addTo(map);
-    markers.push(marker);
-
-    markerMap[tienda]=marker;
-  });
 }
 
 </script>
-
 </body>
 </html>
