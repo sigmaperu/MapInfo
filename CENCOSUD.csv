@@ -1,0 +1,21 @@
+﻿COD_LOCAL,DESCRIPCION_LOCAL,VENTANA HORARIA,RUTA,IMPULSO,codigo sap,Latitud,Longitud,Ruta
+H001,Hipermercado Metro Chorrillos,8:00am a 12:00pm,Ruta 2,Impulso Nuggets,6245178,-12.17064242,-77.01251828,DIA 2
+H002,Hipermercado Metro Breña,7:00am a 10:00am,Ruta 5,,6245179,-12.054307,-77.042429,DIA 5
+H003,Hipermercado Metro Limatambo,7:00am a 11:00am,Ruta 3,Impulso Nuggets,6245181,-12.10872983,-77.0019926,DIA 3
+H005,Hipermercado Metro San Miguel,6:30am a 12:00pm,Ruta 1,Impulso Nuggets,6245182,-12.077654,-77.090583,DIA 1
+H006,Hiper. Metro San Juan de Lurig,6:30am a 10:00am,Ruta 5,Impulso Nuggets,6245183,-12.007111,-77.004826,DIA 5
+H011,Hipermercado Metro Comas,8:00am a 12:00pm,Ruta 4,,6245191,-11.933407,-77.046836,DIA 4
+H013,Hipermercado Metro Independenc,8:00am a 12:00pm,Ruta 4,,6245208,-11.987407,-77.064203,DIA 4
+H014,Hipermercado Metro Plaza Norte,8:00am a 12:00pm,Ruta 4,Impulso Nuggets,6245169,-12.0061552,-77.06085239,DIA 4
+S002,Supermercado Metro Jesús María,7:00am a 11:00am,Ruta 1,solicitar flexibilidad 2 pm,6245194,-12.07376764,-77.05096912,DIA 1
+S005,Supermercado Metro Pershing,7:00am a 11:00am,Ruta 1,solicitar flexibilidad 2 pm,6245197,-12.08913589,-77.05768757,DIA 1
+S011,Supermercado Metro Comas Retab,8:00am a 12:00pm,Ruta 4,,6245201,-11.93368139,-77.05651126,DIA 4
+S028,Supermercado Metro Proceres,7:00am a 12:00pm,Ruta 5,Impulso Nuggets,6245292,-11.97483638,-77.00224386,DIA 5
+S032,Supermercado Metro Faucett,6:30am a 1:00pm,Ruta 1,,6245352,-12.06298609,-77.0963088,DIA 1
+S047,Supermercado Metro Chaclacayo,8:00am a 1:00pm,Supermercado Metro Chaclacayo,,6245366,-11.97477,-76.767706,
+T101,Wong Dos de Mayo,6:00am a 8:00am,Ruta 2,Impulso Nuggets,6245452,-12.09157724,-77.0419562,DIA 2
+T102,Wong Ovalo Gutierrez,6:00am a 12:00pm,Ruta 2,Impulso Nuggets,6245453,-12.10988323,-77.03617581,DIA 2
+T104,Wong Benavides,6:00am a 10:00am,Ruta 3,Impulso Nuggets,6245455,-12.126047,-77.017705,DIA 3
+T106,Wong Chacarilla,8:00am a 11:00am,Ruta 3,Impulso Nuggets,6245456,-12.11151768,-76.99221853,DIA 3
+T107,Wong San Borja,8:00am a 9:00am,Ruta 3,,6245458,-12.08973343,-77.00557239,DIA 3
+T109,Wong San Miguel,6:00am a 8:00am,Ruta 1,Impulso Nuggets,6245460,-12.0774,-77.083182,DIA 1
