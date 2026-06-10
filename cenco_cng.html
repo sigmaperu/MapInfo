@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <title>CENCOSUD - Verificación Coordenadas</title>
 
-<!-- ✅ Leaflet OK -->
-https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
-https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
+<!-- ✅ ESTO ARREGLA TODO -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
 html,body{margin:0;height:100%;font-family:Segoe UI;}
@@ -22,20 +22,16 @@ html,body{margin:0;height:100%;font-family:Segoe UI;}
  border-radius:10px;
  box-shadow:0 4px 15px rgba(0,0,0,0.3);
  width:260px;
- max-height:90%;
+ max-height:85%;
  overflow:auto;
  transition:.3s;
 }
 
-/* MOBILE */
 @media(max-width:768px){
- .panel{
-  width:85%;
-  max-height:70%;
- }
+ .panel{ width:85%; }
 }
 
-/* botón toggle móvil */
+/* botón móvil */
 .toggleBtn{
  position:absolute;
  top:10px; left:10px;
@@ -45,7 +41,6 @@ html,body{margin:0;height:100%;font-family:Segoe UI;}
  padding:8px 12px;
  border-radius:8px;
  cursor:pointer;
- font-size:13px;
  display:none;
 }
 
@@ -79,7 +74,7 @@ html,body{margin:0;height:100%;font-family:Segoe UI;}
 }
 
 .tiendas div{
- padding:4px 2px;
+ padding:4px;
  cursor:pointer;
 }
 
@@ -89,7 +84,7 @@ html,body{margin:0;height:100%;font-family:Segoe UI;}
 
 <body>
 
-<div class="toggleBtn" onclick="togglePanel()">☰ Filtros</div>
+<div class="toggleBtn" onclick="togglePanel()">☰</div>
 
 <div id="map"></div>
 
@@ -110,8 +105,10 @@ let markers=[], markerMap={}, data=[];
 let activeRoutes=new Set(), colorMap={};
 let activeMarker=null, timer=null;
 
-const colors=["#e74c3c","#3498db","#2ecc71","#f39c12",
-"#9b59b6","#16a085","#2c3e50","#e84393"];
+const colors=[
+ "#e74c3c","#3498db","#2ecc71","#f39c12",
+ "#9b59b6","#16a085","#2c3e50","#e84393"
+];
 
 // ICONO
 function icon(color,size=22){
@@ -172,7 +169,6 @@ function highlight(name){
 
 function reset(){
  clearTimeout(timer);
-
  timer=setTimeout(()=>{
    if(activeMarker){
      activeMarker.setIcon(icon(activeMarker.color,22));
@@ -181,7 +177,7 @@ function reset(){
  },120);
 }
 
-// 🔥 CLICK MAPA RESETEA (clave bug fix)
+// 🔥 FIX CLAVE
 map.on('click',reset);
 
 // FILTROS
@@ -198,7 +194,8 @@ function buildFilters(rutas){
   header.className="item-header";
 
   let arrow=document.createElement("span");
-  arrow.className="arrow"; arrow.innerHTML="▼";
+  arrow.className="arrow";
+  arrow.innerHTML="▼";
 
   let chk=document.createElement("input");
   chk.type="checkbox"; chk.checked=true;
@@ -227,14 +224,12 @@ function buildFilters(rutas){
     let d=document.createElement("div");
     d.textContent="• "+t;
 
-    // desktop
     d.onmouseenter=()=>highlight(t);
     d.onmouseleave=()=>reset();
 
-    // móvil (touch)
     d.onclick=()=>{
       highlight(t);
-      setTimeout(reset,1500); // auto reset móvil
+      setTimeout(reset,1500);
     };
 
     list.appendChild(d);
@@ -251,6 +246,7 @@ function buildFilters(rutas){
   cont.append(header,list);
   div.appendChild(cont);
  });
+
 }
 
 // RENDER
@@ -272,13 +268,13 @@ function render(){
    .addTo(map);
 
   m.color=colorMap[r[8]];
-
   markers.push(m);
   markerMap[r[1]]=m;
  });
+
 }
 
-// PANEL MOBILE
+// PANEL
 function togglePanel(){
  document.getElementById("panel").classList.toggle("hidden");
 }
