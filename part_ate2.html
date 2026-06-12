@@ -52,8 +52,7 @@ let reporte = [];
 
 /* ---------- CSV PARSER ---------- */
 function parseCSV(text){
-  const rows = text.split("\n").map(r => r.split(","));
-  return rows.slice(1); // sin header
+  return text.split("\n").map(r => r.split(",")).slice(1);
 }
 
 /* ---------- POINT IN POLYGON ---------- */
@@ -83,7 +82,7 @@ Promise.all([
 
   const data = parseCSV(csvText);
 
-  // Pintar geojson
+  // pintar zonas
   L.geoJSON(geo, {
     style:{ color:"#555", weight:1, fillOpacity:0.1 }
   }).addTo(map);
@@ -95,23 +94,34 @@ Promise.all([
 
     if (isNaN(lat) || isNaN(lng)) return;
 
+    let zonaNombre = "";
+    let frecuencia = "";
     let dentro = false;
 
     geo.features.forEach(f => {
       const coords = f.geometry.coordinates;
 
+      function checkPolygon(polyCoords){
+        if (pointInPoly([lng, lat], polyCoords)) {
+          dentro = true;
+          zonaNombre = f.properties.name || "";
+          frecuencia = f.properties.description || "";
+        }
+      }
+
       if (f.geometry.type === "Polygon") {
-        if (pointInPoly([lng, lat], coords[0])) dentro = true;
+        checkPolygon(coords[0]);
       }
 
       if (f.geometry.type === "MultiPolygon") {
         coords.forEach(poly => {
-          if (pointInPoly([lng, lat], poly[0])) dentro = true;
+          checkPolygon(poly[0]);
         });
       }
     });
 
     if (dentro) {
+
       const marker = L.circleMarker([lat, lng], {
         radius:5,
         color:"#0078d4",
@@ -122,15 +132,18 @@ Promise.all([
         <b>${row[1]}</b><br>
         Código: ${row[0]}<br>
         Canal: ${row[3]}<br>
-        Distrito: ${row[4]}
+        Distrito: ${row[4]}<br>
+        Zona: ${zonaNombre}<br>
+        Frecuencia: ${frecuencia}
       `);
 
-      // Guardar para exportación
       reporte.push({
         Codigo: row[0],
         Nombre: row[1],
         Canal: row[3],
-        Distrito: row[4]
+        Distrito: row[4],
+        Zona: zonaNombre,
+        Frecuencia: frecuencia
       });
     }
 
@@ -144,10 +157,10 @@ Promise.all([
 /* ---------- EXPORT CSV ---------- */
 function exportCSV(){
 
-  let csv = "Codigo,Nombre,Canal,Distrito\n";
+  let csv = "Codigo,Nombre,Canal,Distrito,Zona,Frecuencia\n";
 
   reporte.forEach(r => {
-    csv += `${r.Codigo},${r.Nombre},${r.Canal},${r.Distrito}\n`;
+    csv += `${r.Codigo},${r.Nombre},${r.Canal},${r.Distrito},${r.Zona},${r.Frecuencia}\n`;
   });
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
