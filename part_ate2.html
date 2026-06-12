@@ -10,21 +10,50 @@
 <style>
 body { margin:0; font-family: Arial; }
 #map { height: 90vh; }
+
 #toolbar {
   height:10vh;
   display:flex;
   align-items:center;
+  gap:15px;
   padding:10px;
-  gap:10px;
   background:#f4f4f4;
 }
+
+select, button {
+  padding:6px 10px;
+  border-radius:6px;
+  border:1px solid #ccc;
+}
+
 button {
-  padding:8px 14px;
-  border:none;
   background:#0078d4;
   color:white;
-  border-radius:6px;
-  cursor:pointer;
+  border:none;
+}
+
+#legend {
+  position:absolute;
+  bottom:15px;
+  right:15px;
+  background:white;
+  padding:10px;
+  border-radius:8px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.2);
+  font-size:12px;
+  max-width:200px;
+}
+.legend-item{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:4px;
+}
+.box{
+  width:14px; height:14px;
+}
+.circle{
+  width:10px; height:10px; border-radius:50%;
 }
 </style>
 </head>
@@ -32,11 +61,15 @@ button {
 <body>
 
 <div id="toolbar">
-  <button onclick="exportCSV()">Descargar reporte CSV</button>
+  <button onclick="exportCSV()">Descargar CSV</button>
+  <select id="canalFilter" onchange="filtrar()">
+    <option value="ALL">Todos los canales</option>
+  </select>
   <span id="counter"></span>
 </div>
 
 <div id="map"></div>
+<div id="legend"></div>
 
 <script>
 
@@ -49,151 +82,189 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   maxZoom: 19
 }).addTo(map);
 
+let markers = [];
 let reporte = [];
+let allData = [];
+let geoData;
+
+/* ---------- COLORES ---------- */
+const zonaColors = {};
+const canalColors = {};
+const palette = ["#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#a65628","#f781bf"];
 
 /* ---------- CSV ---------- */
 function parseCSV(text){
   return text.split("\n").slice(1).map(r=>{
-    let cols = r.split(",");
-    if(cols.length<5) cols = r.split(";");
-    return cols.map(c=>c.replace(/"/g,"").trim());
+    let c = r.split(",");
+    if(c.length<5) c = r.split(";");
+    return c.map(x=>x.replace(/"/g,"").trim());
   });
 }
 
-/* ---------- POINT IN POLYGON ---------- */
-function pointInRing(point, ring){
-  const x = point[0], y = point[1];
-  let inside = false;
-
+/* ---------- GEOMETRIA ---------- */
+function pointInRing(p, ring){
+  let x=p[0], y=p[1], inside=false;
   for(let i=0,j=ring.length-1;i<ring.length;j=i++){
-    const xi=ring[i][0], yi=ring[i][1];
-    const xj=ring[j][0], yj=ring[j][1];
-
-    const intersect = ((yi>y)!=(yj>y)) &&
-      (x < (xj-xi)*(y-yi)/(yj-yi)+xi);
-
+    let xi=ring[i][0], yi=ring[i][1];
+    let xj=ring[j][0], yj=ring[j][1];
+    let intersect=((yi>y)!=(yj>y)) && (x<(xj-xi)*(y-yi)/(yj-yi)+xi);
     if(intersect) inside=!inside;
   }
-
   return inside;
 }
 
-/* ---------- GEOMETRÍA CORRECTA CON HOLES ---------- */
-function pointInPolygonWithHoles(lat,lng,coords){
-
-  const outer = coords[0];
-  if(!pointInRing([lng,lat], outer)) return false;
-
+function inPoly(lat,lng,coords){
+  if(!pointInRing([lng,lat],coords[0])) return false;
   for(let i=1;i<coords.length;i++){
-    if(pointInRing([lng,lat], coords[i])) return false;
+    if(pointInRing([lng,lat],coords[i])) return false;
   }
-
   return true;
 }
 
-function pointInGeometry(lat,lng,g){
-
-  if(g.type==="Polygon"){
-    return pointInPolygonWithHoles(lat,lng,g.coordinates);
-  }
-
+function inGeo(lat,lng,g){
+  if(g.type==="Polygon") return inPoly(lat,lng,g.coordinates);
   if(g.type==="MultiPolygon"){
-    for(let poly of g.coordinates){
-      if(pointInPolygonWithHoles(lat,lng,poly)) return true;
-    }
+    return g.coordinates.some(p=>inPoly(lat,lng,p));
   }
-
-  return false;
 }
 
 /* ---------- LOAD ---------- */
 Promise.all([
-  fetch(csvURL).then(r=>r.text()),
-  fetch(geoURL).then(r=>r.json())
-]).then(([csvText,geo])=>{
+fetch(csvURL).then(r=>r.text()),
+fetch(geoURL).then(r=>r.json())
+]).then(([csvText, geo])=>{
+
+  geoData = geo;
+
+  // colores zonas
+  geo.features.forEach((f,i)=>{
+    zonaColors[f.properties.name] = palette[i % palette.length];
+  });
+
+  // pintar zonas
+  L.geoJSON(geo,{
+    style:f=>({
+      color: zonaColors[f.properties.name],
+      weight:2,
+      fillOpacity:0.15
+    })
+  }).addTo(map);
 
   const data = parseCSV(csvText);
+  allData = data;
 
-  L.geoJSON(geo,{
-    style:{color:"#555",weight:1,fillOpacity:0.1}
-  }).addTo(map);
+  generarCanales(data);
+  render(data);
+
+  crearLeyenda();
+});
+
+/* ---------- GENERAR FILTRO ---------- */
+function generarCanales(data){
+  let set = new Set(data.map(r=>r[3]));
+  let i=0;
+  set.forEach(c=>{
+    canalColors[c] = palette[i++ % palette.length];
+    let opt = document.createElement("option");
+    opt.value=c;
+    opt.textContent=c;
+    canalFilter.appendChild(opt);
+  });
+}
+
+/* ---------- RENDER ---------- */
+function render(data){
+
+  markers.forEach(m=>map.removeLayer(m));
+  markers=[];
+  reporte=[];
 
   data.forEach(row=>{
 
-    let lat = parseFloat(row[8]);
-    let lng = parseFloat(row[9]);
-
+    let lat=parseFloat(row[8]);
+    let lng=parseFloat(row[9]);
     if(isNaN(lat)||isNaN(lng)) return;
 
-    let zona="", freq="";
-    let dentro=false;
+    for(let f of geoData.features){
 
-    for(let f of geo.features){
+      if(inGeo(lat,lng,f.geometry)||inGeo(lng,lat,f.geometry)){
 
-      if(pointInGeometry(lat,lng,f.geometry) ||
-         pointInGeometry(lng,lat,f.geometry))
-      {
-        dentro=true;
-        zona=f.properties.name||"";
-        freq=f.properties.description||"";
-        break; // 🔥 importante: detener en el primero correcto
+        const color = canalColors[row[3]] || "#000";
+
+        let m = L.circleMarker([lat,lng],{
+          radius:5,
+          color:color,
+          fillOpacity:0.9
+        }).addTo(map);
+
+        m.bindPopup(`
+          <b>${row[1]}</b><br>
+          Canal: ${row[3]}<br>
+          Zona: ${f.properties.name}
+        `);
+
+        markers.push(m);
+
+        reporte.push({
+          Codigo:row[0],
+          Nombre:row[1],
+          Canal:row[3],
+          Distrito:row[4],
+          Zona:f.properties.name,
+          Frecuencia:f.properties.description
+        });
+
+        break;
       }
     }
-
-    if(dentro){
-
-      L.circleMarker([lat,lng],{
-        radius:5,
-        color:"#0078d4",
-        fillOpacity:0.8
-      })
-      .addTo(map)
-      .bindPopup(`
-        <b>${row[1]}</b><br>
-        Código: ${row[0]}<br>
-        Canal: ${row[3]}<br>
-        Distrito: ${row[4]}<br>
-        Zona: ${zona}<br>
-        Frecuencia: ${freq}
-      `);
-
-      reporte.push({
-        Codigo:row[0],
-        Nombre:row[1],
-        Canal:row[3],
-        Distrito:row[4],
-        Zona:zona,
-        Frecuencia:freq
-      });
-    }
-
   });
 
-  document.getElementById("counter").innerText =
-    "Clientes dentro de zonas: "+reporte.length;
+  counter.innerText="Clientes: "+reporte.length;
+}
 
-});
+/* ---------- FILTRO ---------- */
+function filtrar(){
+  let val = canalFilter.value;
 
-/* ---------- EXPORT ---------- */
+  if(val==="ALL") render(allData);
+  else render(allData.filter(r=>r[3]===val));
+}
+
+/* ---------- CSV ---------- */
 function exportCSV(){
-
   let csv="Codigo,Nombre,Canal,Distrito,Zona,Frecuencia\n";
-
   reporte.forEach(r=>{
-    csv += `${r.Codigo},${r.Nombre},${r.Canal},${r.Distrito},${r.Zona},${r.Frecuencia}\n`;
+    csv+=`${r.Codigo},${r.Nombre},${r.Canal},${r.Distrito},${r.Zona},${r.Frecuencia}\n`;
   });
 
-  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  const link = document.createElement("a");
-
-  link.href = URL.createObjectURL(blob);
-  link.download = "reporte_clientes_particiones.csv";
-
+  let blob=new Blob([csv]);
+  let link=document.createElement("a");
+  link.href=URL.createObjectURL(blob);
+  link.download="reporte.csv";
   link.click();
+}
+
+/* ---------- LEYENDA ---------- */
+function crearLeyenda(){
+
+  let html="<b>Zonas</b><br>";
+  for(let z in zonaColors){
+    html+=`<div class='legend-item'>
+      <div class='box' style='background:${zonaColors[z]}'></div>${z}
+    </div>`;
+  }
+
+  html+="<br><b>Canales</b><br>";
+  for(let c in canalColors){
+    html+=`<div class='legend-item'>
+      <div class='circle' style='background:${canalColors[c]}'></div>${c}
+    </div>`;
+  }
+
+  legend.innerHTML=html;
 }
 
 </script>
 
 </body>
 </html>
-``
