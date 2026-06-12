@@ -4,12 +4,12 @@
 <meta charset="utf-8"/>
 <title>Clientes por Partición</title>
 
-https://unpkg.com/leaflet/dist/leaflet.css
-https://unpkg.com/leaflet/dist/leaflet.js
+<!-- ✅ Leaflet correcto -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
 body { margin:0; font-family: 'Segoe UI', Arial; background:#f0f2f5; }
-
 #map { height: 90vh; }
 
 #toolbar {
@@ -26,7 +26,6 @@ select, button {
   padding:8px 12px;
   border-radius:8px;
   border:1px solid #ccc;
-  font-size:14px;
 }
 
 button {
@@ -34,10 +33,6 @@ button {
   color:white;
   border:none;
   cursor:pointer;
-  transition:0.2s;
-}
-button:hover {
-  background:#005fa3;
 }
 
 #legend {
@@ -45,16 +40,10 @@ button:hover {
   bottom:20px;
   right:20px;
   background:white;
-  padding:12px 14px;
+  padding:12px;
   border-radius:10px;
   box-shadow:0 4px 12px rgba(0,0,0,0.15);
   font-size:13px;
-  max-width:220px;
-}
-
-.legend-title{
-  font-weight:bold;
-  margin-bottom:8px;
 }
 
 .legend-item{
@@ -68,10 +57,6 @@ button:hover {
   width:12px;
   height:12px;
   border-radius:50%;
-}
-
-#counter {
-  font-weight:bold;
 }
 </style>
 </head>
@@ -154,10 +139,10 @@ fetch(geoURL).then(r=>r.json())
 
   geoData = geo;
 
-  // pintar zonas (suaves)
+  // poligonos suaves
   L.geoJSON(geo,{
     style:{
-      color:"#999",
+      color:"#888",
       weight:1.5,
       fillOpacity:0.08
     }
@@ -183,7 +168,7 @@ function generarCanales(data){
     let opt = document.createElement("option");
     opt.value=c;
     opt.textContent=c;
-    canalFilter.appendChild(opt);
+    document.getElementById("canalFilter").appendChild(opt);
   });
 }
 
@@ -203,7 +188,7 @@ function render(data){
     for(let f of geoData.features){
 
       if(inGeo(lat,lng,f.geometry)){
-        
+
         const color = canalColors[row[3]] || "#333";
 
         let m = L.circleMarker([lat,lng],{
@@ -212,12 +197,6 @@ function render(data){
           fillColor:color,
           fillOpacity:0.9
         }).addTo(map);
-
-        m.bindPopup(`
-          <b>${row[1]}</b><br>
-          Canal: ${row[3]}<br>
-          Zona: ${f.properties.name}
-        `);
 
         markers.push(m);
 
@@ -235,12 +214,12 @@ function render(data){
     }
   });
 
-  counter.innerText="Clientes: "+reporte.length;
+  document.getElementById("counter").innerText="Clientes: "+reporte.length;
 }
 
 /* ---------- FILTRO ---------- */
 function filtrar(){
-  let val = canalFilter.value;
+  let val = document.getElementById("canalFilter").value;
 
   if(val==="ALL") render(allData);
   else render(allData.filter(r=>r[3]===val));
@@ -260,20 +239,20 @@ function exportCSV(){
   link.click();
 }
 
-/* ---------- LEYENDA SOLO CANALES ---------- */
+/* ---------- LEYENDA ---------- */
 function crearLeyenda(){
 
-  let html = `<div class="legend-title">Canales</div>`;
+  let html="<b>Canales</b><br>";
 
   for(let c in canalColors){
-    html += `
+    html+=`
     <div class="legend-item">
       <div class="circle" style="background:${canalColors[c]}"></div>
       ${c}
     </div>`;
   }
 
-  legend.innerHTML = html;
+  document.getElementById("legend").innerHTML=html;
 }
 
 </script>
