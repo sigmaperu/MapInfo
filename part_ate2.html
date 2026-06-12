@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>Clientes por Partición</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+body { margin:0; font-family: Arial; }
+#map { height: 90vh; }
+#toolbar {
+  height:10vh;
+  display:flex;
+  align-items:center;
+  padding:10px;
+  gap:10px;
+  background:#f4f4f4;
+}
+button {
+  padding:8px 14px;
+  border:none;
+  background:#0078d4;
+  color:white;
+  border-radius:6px;
+  cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div id="toolbar">
+  <button onclick="exportCSV()">Descargar reporte CSV</button>
+  <span id="counter"></span>
+</div>
+
+<div id="map"></div>
+
+<script>
+const csvURL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/CAT%20ATE%202.csv";
+const geoURL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Particiones.geojson";
+
+const map = L.map('map').setView([-12.05, -76.95], 11);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
+}).addTo(map);
+
+let reporte = [];
+
+/* ---------- CSV PARSER ---------- */
+function parseCSV(text){
+  const rows = text.split("\n").map(r => r.split(","));
+  return rows.slice(1); // sin header
+}
+
+/* ---------- POINT IN POLYGON ---------- */
+function pointInPoly(point, vs) {
+  const x = point[0], y = point[1];
+  let inside = false;
+
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    let xi = vs[i][0], yi = vs[i][1];
+    let xj = vs[j][0], yj = vs[j][1];
+
+    let intersect = ((yi > y) != (yj > y)) &&
+      (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+
+    if (intersect) inside = !inside;
+  }
+
+  return inside;
+}
+
+/* ---------- LOAD DATA ---------- */
+Promise.all([
+  fetch(csvURL).then(r => r.text()),
+  fetch(geoURL).then(r => r.json())
+])
+.then(([csvText, geo]) => {
+
+  const data = parseCSV(csvText);
+
+  // Pintar geojson
+  L.geoJSON(geo, {
+    style:{ color:"#555", weight:1, fillOpacity:0.1 }
+  }).addTo(map);
+
+  data.forEach(row => {
+
+    const lat = parseFloat(row[8]);
+    const lng = parseFloat(row[9]);
+
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    let dentro = false;
+
+    geo.features.forEach(f => {
+      const coords = f.geometry.coordinates;
+
+      if (f.geometry.type === "Polygon") {
+        if (pointInPoly([lng, lat], coords[0])) dentro = true;
+      }
+
+      if (f.geometry.type === "MultiPolygon") {
+        coords.forEach(poly => {
+          if (pointInPoly([lng, lat], poly[0])) dentro = true;
+        });
+      }
+    });
+
+    if (dentro) {
+      const marker = L.circleMarker([lat, lng], {
+        radius:5,
+        color:"#0078d4",
+        fillOpacity:0.8
+      }).addTo(map);
+
+      marker.bindPopup(`
+        <b>${row[1]}</b><br>
+        Código: ${row[0]}<br>
+        Canal: ${row[3]}<br>
+        Distrito: ${row[4]}
+      `);
+
+      // Guardar para exportación
+      reporte.push({
+        Codigo: row[0],
+        Nombre: row[1],
+        Canal: row[3],
+        Distrito: row[4]
+      });
+    }
+
+  });
+
+  document.getElementById("counter").innerText =
+    "Clientes dentro de zonas: " + reporte.length;
+
+});
+
+/* ---------- EXPORT CSV ---------- */
+function exportCSV(){
+
+  let csv = "Codigo,Nombre,Canal,Distrito\n";
+
+  reporte.forEach(r => {
+    csv += `${r.Codigo},${r.Nombre},${r.Canal},${r.Distrito}\n`;
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+
+  link.href = URL.createObjectURL(blob);
+  link.download = "reporte_clientes_particiones.csv";
+
+  link.click();
+}
+</script>
+
+</body>
+</html>
