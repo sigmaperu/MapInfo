@@ -39,10 +39,11 @@ button {
 <div id="map"></div>
 
 <script>
+
 const csvURL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/CAT%20ATE%202.csv";
 const geoURL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Particiones.geojson";
 
-const map = L.map('map').setView([-12.05, -76.95], 11);
+const map = L.map('map').setView([-12.10, -76.95], 11);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19
@@ -50,9 +51,13 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 let reporte = [];
 
-/* ---------- CSV PARSER ---------- */
+/* ---------- CSV FLEXIBLE ---------- */
 function parseCSV(text){
-  return text.split("\n").map(r => r.split(",")).slice(1);
+  return text.split("\n").slice(1).map(row => {
+    let cols = row.split(",");
+    if (cols.length < 5) cols = row.split(";"); // fallback
+    return cols.map(c => c.replace(/"/g,"").trim());
+  });
 }
 
 /* ---------- POINT IN POLYGON ---------- */
@@ -61,16 +66,39 @@ function pointInPoly(point, vs) {
   let inside = false;
 
   for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-    let xi = vs[i][0], yi = vs[i][1];
-    let xj = vs[j][0], yj = vs[j][1];
+    const xi = vs[i][0], yi = vs[i][1];
+    const xj = vs[j][0], yj = vs[j][1];
 
-    let intersect = ((yi > y) != (yj > y)) &&
+    const intersect = ((yi > y) != (yj > y)) &&
       (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
 
     if (intersect) inside = !inside;
   }
 
   return inside;
+}
+
+/* ---------- VALIDACIÓN MULTI-RING ---------- */
+function pointInGeometry(lat, lng, geometry){
+
+  function checkRings(rings){
+    for (let ring of rings){
+      if (pointInPoly([lng, lat], ring)) return true;
+    }
+    return false;
+  }
+
+  if (geometry.type === "Polygon") {
+    return checkRings(geometry.coordinates);
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    for (let poly of geometry.coordinates){
+      if (checkRings(poly)) return true;
+    }
+  }
+
+  return false;
 }
 
 /* ---------- LOAD DATA ---------- */
@@ -82,15 +110,14 @@ Promise.all([
 
   const data = parseCSV(csvText);
 
-  // pintar zonas
   L.geoJSON(geo, {
     style:{ color:"#555", weight:1, fillOpacity:0.1 }
   }).addTo(map);
 
   data.forEach(row => {
 
-    const lat = parseFloat(row[8]);
-    const lng = parseFloat(row[9]);
+    let lat = parseFloat(row[8]);
+    let lng = parseFloat(row[9]);
 
     if (isNaN(lat) || isNaN(lng)) return;
 
@@ -99,24 +126,19 @@ Promise.all([
     let dentro = false;
 
     geo.features.forEach(f => {
-      const coords = f.geometry.coordinates;
 
-      function checkPolygon(polyCoords){
-        if (pointInPoly([lng, lat], polyCoords)) {
-          dentro = true;
-          zonaNombre = f.properties.name || "";
-          frecuencia = f.properties.description || "";
-        }
+      // intento normal
+      if (pointInGeometry(lat, lng, f.geometry)) {
+        dentro = true;
+      }
+      // fallback invertido
+      else if (pointInGeometry(lng, lat, f.geometry)) {
+        dentro = true;
       }
 
-      if (f.geometry.type === "Polygon") {
-        checkPolygon(coords[0]);
-      }
-
-      if (f.geometry.type === "MultiPolygon") {
-        coords.forEach(poly => {
-          checkPolygon(poly[0]);
-        });
+      if (dentro) {
+        zonaNombre = f.properties.name || "";
+        frecuencia = f.properties.description || "";
       }
     });
 
@@ -171,6 +193,7 @@ function exportCSV(){
 
   link.click();
 }
+
 </script>
 
 </body>
