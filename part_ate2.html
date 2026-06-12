@@ -45,147 +45,145 @@ const geoURL = "https://raw.githubusercontent.com/sigmaperu/MapInfo/main/Partici
 
 const map = L.map('map').setView([-12.10, -76.95], 11);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   maxZoom: 19
 }).addTo(map);
 
 let reporte = [];
 
-/* ---------- CSV FLEXIBLE ---------- */
+/* ---------- CSV ---------- */
 function parseCSV(text){
-  return text.split("\n").slice(1).map(row => {
-    let cols = row.split(",");
-    if (cols.length < 5) cols = row.split(";"); // fallback
-    return cols.map(c => c.replace(/"/g,"").trim());
+  return text.split("\n").slice(1).map(r=>{
+    let cols = r.split(",");
+    if(cols.length<5) cols = r.split(";");
+    return cols.map(c=>c.replace(/"/g,"").trim());
   });
 }
 
 /* ---------- POINT IN POLYGON ---------- */
-function pointInPoly(point, vs) {
+function pointInRing(point, ring){
   const x = point[0], y = point[1];
   let inside = false;
 
-  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-    const xi = vs[i][0], yi = vs[i][1];
-    const xj = vs[j][0], yj = vs[j][1];
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const xi=ring[i][0], yi=ring[i][1];
+    const xj=ring[j][0], yj=ring[j][1];
 
-    const intersect = ((yi > y) != (yj > y)) &&
-      (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    const intersect = ((yi>y)!=(yj>y)) &&
+      (x < (xj-xi)*(y-yi)/(yj-yi)+xi);
 
-    if (intersect) inside = !inside;
+    if(intersect) inside=!inside;
   }
 
   return inside;
 }
 
-/* ---------- VALIDACIÓN MULTI-RING ---------- */
-function pointInGeometry(lat, lng, geometry){
+/* ---------- GEOMETRÍA CORRECTA CON HOLES ---------- */
+function pointInPolygonWithHoles(lat,lng,coords){
 
-  function checkRings(rings){
-    for (let ring of rings){
-      if (pointInPoly([lng, lat], ring)) return true;
-    }
-    return false;
+  const outer = coords[0];
+  if(!pointInRing([lng,lat], outer)) return false;
+
+  for(let i=1;i<coords.length;i++){
+    if(pointInRing([lng,lat], coords[i])) return false;
   }
 
-  if (geometry.type === "Polygon") {
-    return checkRings(geometry.coordinates);
+  return true;
+}
+
+function pointInGeometry(lat,lng,g){
+
+  if(g.type==="Polygon"){
+    return pointInPolygonWithHoles(lat,lng,g.coordinates);
   }
 
-  if (geometry.type === "MultiPolygon") {
-    for (let poly of geometry.coordinates){
-      if (checkRings(poly)) return true;
+  if(g.type==="MultiPolygon"){
+    for(let poly of g.coordinates){
+      if(pointInPolygonWithHoles(lat,lng,poly)) return true;
     }
   }
 
   return false;
 }
 
-/* ---------- LOAD DATA ---------- */
+/* ---------- LOAD ---------- */
 Promise.all([
-  fetch(csvURL).then(r => r.text()),
-  fetch(geoURL).then(r => r.json())
-])
-.then(([csvText, geo]) => {
+  fetch(csvURL).then(r=>r.text()),
+  fetch(geoURL).then(r=>r.json())
+]).then(([csvText,geo])=>{
 
   const data = parseCSV(csvText);
 
-  L.geoJSON(geo, {
-    style:{ color:"#555", weight:1, fillOpacity:0.1 }
+  L.geoJSON(geo,{
+    style:{color:"#555",weight:1,fillOpacity:0.1}
   }).addTo(map);
 
-  data.forEach(row => {
+  data.forEach(row=>{
 
     let lat = parseFloat(row[8]);
     let lng = parseFloat(row[9]);
 
-    if (isNaN(lat) || isNaN(lng)) return;
+    if(isNaN(lat)||isNaN(lng)) return;
 
-    let zonaNombre = "";
-    let frecuencia = "";
-    let dentro = false;
+    let zona="", freq="";
+    let dentro=false;
 
-    geo.features.forEach(f => {
+    for(let f of geo.features){
 
-      // intento normal
-      if (pointInGeometry(lat, lng, f.geometry)) {
-        dentro = true;
+      if(pointInGeometry(lat,lng,f.geometry) ||
+         pointInGeometry(lng,lat,f.geometry))
+      {
+        dentro=true;
+        zona=f.properties.name||"";
+        freq=f.properties.description||"";
+        break; // 🔥 importante: detener en el primero correcto
       }
-      // fallback invertido
-      else if (pointInGeometry(lng, lat, f.geometry)) {
-        dentro = true;
-      }
+    }
 
-      if (dentro) {
-        zonaNombre = f.properties.name || "";
-        frecuencia = f.properties.description || "";
-      }
-    });
+    if(dentro){
 
-    if (dentro) {
-
-      const marker = L.circleMarker([lat, lng], {
+      L.circleMarker([lat,lng],{
         radius:5,
         color:"#0078d4",
         fillOpacity:0.8
-      }).addTo(map);
-
-      marker.bindPopup(`
+      })
+      .addTo(map)
+      .bindPopup(`
         <b>${row[1]}</b><br>
         Código: ${row[0]}<br>
         Canal: ${row[3]}<br>
         Distrito: ${row[4]}<br>
-        Zona: ${zonaNombre}<br>
-        Frecuencia: ${frecuencia}
+        Zona: ${zona}<br>
+        Frecuencia: ${freq}
       `);
 
       reporte.push({
-        Codigo: row[0],
-        Nombre: row[1],
-        Canal: row[3],
-        Distrito: row[4],
-        Zona: zonaNombre,
-        Frecuencia: frecuencia
+        Codigo:row[0],
+        Nombre:row[1],
+        Canal:row[3],
+        Distrito:row[4],
+        Zona:zona,
+        Frecuencia:freq
       });
     }
 
   });
 
   document.getElementById("counter").innerText =
-    "Clientes dentro de zonas: " + reporte.length;
+    "Clientes dentro de zonas: "+reporte.length;
 
 });
 
-/* ---------- EXPORT CSV ---------- */
+/* ---------- EXPORT ---------- */
 function exportCSV(){
 
-  let csv = "Codigo,Nombre,Canal,Distrito,Zona,Frecuencia\n";
+  let csv="Codigo,Nombre,Canal,Distrito,Zona,Frecuencia\n";
 
-  reporte.forEach(r => {
+  reporte.forEach(r=>{
     csv += `${r.Codigo},${r.Nombre},${r.Canal},${r.Distrito},${r.Zona},${r.Frecuencia}\n`;
   });
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const link = document.createElement("a");
 
   link.href = URL.createObjectURL(blob);
@@ -198,3 +196,4 @@ function exportCSV(){
 
 </body>
 </html>
+``
