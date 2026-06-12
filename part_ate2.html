@@ -4,11 +4,12 @@
 <meta charset="utf-8"/>
 <title>Clientes por Partición</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+https://unpkg.com/leaflet/dist/leaflet.css
+https://unpkg.com/leaflet/dist/leaflet.js
 
 <style>
-body { margin:0; font-family: Arial; }
+body { margin:0; font-family: 'Segoe UI', Arial; background:#f0f2f5; }
+
 #map { height: 90vh; }
 
 #toolbar {
@@ -16,44 +17,61 @@ body { margin:0; font-family: Arial; }
   display:flex;
   align-items:center;
   gap:15px;
-  padding:10px;
-  background:#f4f4f4;
+  padding:10px 20px;
+  background:white;
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
 }
 
 select, button {
-  padding:6px 10px;
-  border-radius:6px;
+  padding:8px 12px;
+  border-radius:8px;
   border:1px solid #ccc;
+  font-size:14px;
 }
 
 button {
   background:#0078d4;
   color:white;
   border:none;
+  cursor:pointer;
+  transition:0.2s;
+}
+button:hover {
+  background:#005fa3;
 }
 
 #legend {
   position:absolute;
-  bottom:15px;
-  right:15px;
+  bottom:20px;
+  right:20px;
   background:white;
-  padding:10px;
-  border-radius:8px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.2);
-  font-size:12px;
-  max-width:200px;
+  padding:12px 14px;
+  border-radius:10px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  font-size:13px;
+  max-width:220px;
 }
+
+.legend-title{
+  font-weight:bold;
+  margin-bottom:8px;
+}
+
 .legend-item{
   display:flex;
   align-items:center;
-  gap:6px;
-  margin-bottom:4px;
+  gap:8px;
+  margin-bottom:6px;
 }
-.box{
-  width:14px; height:14px;
-}
+
 .circle{
-  width:10px; height:10px; border-radius:50%;
+  width:12px;
+  height:12px;
+  border-radius:50%;
+}
+
+#counter {
+  font-weight:bold;
 }
 </style>
 </head>
@@ -62,9 +80,11 @@ button {
 
 <div id="toolbar">
   <button onclick="exportCSV()">Descargar CSV</button>
+
   <select id="canalFilter" onchange="filtrar()">
     <option value="ALL">Todos los canales</option>
   </select>
+
   <span id="counter"></span>
 </div>
 
@@ -87,10 +107,8 @@ let reporte = [];
 let allData = [];
 let geoData;
 
-/* ---------- COLORES ---------- */
-const zonaColors = {};
 const canalColors = {};
-const palette = ["#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#a65628","#f781bf"];
+const palette = ["#0078d4","#e81123","#107c10","#ff8c00","#5c2d91","#008272","#c239b3"];
 
 /* ---------- CSV ---------- */
 function parseCSV(text){
@@ -101,7 +119,7 @@ function parseCSV(text){
   });
 }
 
-/* ---------- GEOMETRIA ---------- */
+/* ---------- GEOMETRÍA ---------- */
 function pointInRing(p, ring){
   let x=p[0], y=p[1], inside=false;
   for(let i=0,j=ring.length-1;i<ring.length;j=i++){
@@ -136,18 +154,13 @@ fetch(geoURL).then(r=>r.json())
 
   geoData = geo;
 
-  // colores zonas
-  geo.features.forEach((f,i)=>{
-    zonaColors[f.properties.name] = palette[i % palette.length];
-  });
-
-  // pintar zonas
+  // pintar zonas (suaves)
   L.geoJSON(geo,{
-    style:f=>({
-      color: zonaColors[f.properties.name],
-      weight:2,
-      fillOpacity:0.15
-    })
+    style:{
+      color:"#999",
+      weight:1.5,
+      fillOpacity:0.08
+    }
   }).addTo(map);
 
   const data = parseCSV(csvText);
@@ -155,16 +168,18 @@ fetch(geoURL).then(r=>r.json())
 
   generarCanales(data);
   render(data);
-
   crearLeyenda();
 });
 
-/* ---------- GENERAR FILTRO ---------- */
+/* ---------- CANALES ---------- */
 function generarCanales(data){
   let set = new Set(data.map(r=>r[3]));
   let i=0;
+
   set.forEach(c=>{
-    canalColors[c] = palette[i++ % palette.length];
+    const color = palette[i++ % palette.length];
+    canalColors[c] = color;
+
     let opt = document.createElement("option");
     opt.value=c;
     opt.textContent=c;
@@ -187,13 +202,14 @@ function render(data){
 
     for(let f of geoData.features){
 
-      if(inGeo(lat,lng,f.geometry)||inGeo(lng,lat,f.geometry)){
-
-        const color = canalColors[row[3]] || "#000";
+      if(inGeo(lat,lng,f.geometry)){
+        
+        const color = canalColors[row[3]] || "#333";
 
         let m = L.circleMarker([lat,lng],{
           radius:5,
           color:color,
+          fillColor:color,
           fillOpacity:0.9
         }).addTo(map);
 
@@ -244,24 +260,20 @@ function exportCSV(){
   link.click();
 }
 
-/* ---------- LEYENDA ---------- */
+/* ---------- LEYENDA SOLO CANALES ---------- */
 function crearLeyenda(){
 
-  let html="<b>Zonas</b><br>";
-  for(let z in zonaColors){
-    html+=`<div class='legend-item'>
-      <div class='box' style='background:${zonaColors[z]}'></div>${z}
-    </div>`;
-  }
+  let html = `<div class="legend-title">Canales</div>`;
 
-  html+="<br><b>Canales</b><br>";
   for(let c in canalColors){
-    html+=`<div class='legend-item'>
-      <div class='circle' style='background:${canalColors[c]}'></div>${c}
+    html += `
+    <div class="legend-item">
+      <div class="circle" style="background:${canalColors[c]}"></div>
+      ${c}
     </div>`;
   }
 
-  legend.innerHTML=html;
+  legend.innerHTML = html;
 }
 
 </script>
